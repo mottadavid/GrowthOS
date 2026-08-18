@@ -6,21 +6,29 @@ import {
   wiserrGrowthSnapshotAuthorityFingerprint
 } from '../src/integrations/wiserr/growth-snapshot-authority.mjs';
 
-test('current producer basis is valid and uses the actual audited guarded paths', () => {
+const CURRENT_UNMOUNTED_FINGERPRINT = '5682a8ce6223466f7f391929d5957515fef34c918cacc52a202041324f2c1588';
+
+test('current unmounted producer basis guards only the actual audited producer surfaces', () => {
   const basis = currentWiserrGrowthSnapshotProducerBasis();
   assert.equal(validateWiserrGrowthSnapshotAuthorityBasis(basis), basis);
-  assert.equal(basis.guardedPaths.includes('docs/growth/GROWTHOS_READ_CONTRACT.md'), true);
+  assert.deepEqual([...basis.guardedPaths].sort(), [
+    'docs/growth/GROWTHOS_READ_CONTRACT.md',
+    'server/growth/growthSnapshotService.ts',
+    'tests/growth/growthSnapshotService.test.ts'
+  ]);
   assert.equal(basis.guardedPaths.includes('docs/growth/GROWTHOS_WISERR_AUTHORITY_CONTRACT.md'), false);
+  assert.equal(basis.guardedPaths.includes('server/routes/tenantInfoRoutes.ts'), false);
+  assert.equal(basis.guardedPaths.includes('server/index.ts'), false);
   assert.equal(basis.readSurface.mounted, false);
   assert.equal(basis.capabilities.readGrowthSnapshot, false);
 });
 
-test('same semantic basis yields a deterministic fingerprint', () => {
+test('same semantic basis yields the pinned deterministic unmounted-producer fingerprint', () => {
   const first = currentWiserrGrowthSnapshotProducerBasis();
   const second = structuredClone(first);
   second.guardedPaths = [...second.guardedPaths].reverse();
   assert.equal(wiserrGrowthSnapshotAuthorityFingerprint(first), wiserrGrowthSnapshotAuthorityFingerprint(second));
-  assert.match(wiserrGrowthSnapshotAuthorityFingerprint(first), /^[0-9a-f]{64}$/);
+  assert.equal(wiserrGrowthSnapshotAuthorityFingerprint(first), CURRENT_UNMOUNTED_FINGERPRINT);
 });
 
 test('non-semantic implementation metadata does not change the contract fingerprint', () => {
@@ -45,9 +53,10 @@ test('cohort semantic change changes the fingerprint', () => {
   );
 });
 
-test('mounting a certified read surface changes the fingerprint and requires capability agreement', () => {
+test('mounting a certified read surface changes the fingerprint and requires route surfaces to be guarded', () => {
   const basis = currentWiserrGrowthSnapshotProducerBasis();
   const mounted = structuredClone(basis);
+  mounted.guardedPaths.push('server/routes/tenantInfoRoutes.ts');
   mounted.readSurface = {
     mounted: true,
     authAuthority: 'WISERR_OWNER_ADMIN_JWT',

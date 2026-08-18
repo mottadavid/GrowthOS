@@ -88,9 +88,7 @@ export function currentWiserrGrowthSnapshotProducerBasis() {
     guardedPaths: [
       'server/growth/growthSnapshotService.ts',
       'tests/growth/growthSnapshotService.test.ts',
-      'docs/growth/GROWTHOS_READ_CONTRACT.md',
-      'server/routes/tenantInfoRoutes.ts',
-      'server/index.ts'
+      'docs/growth/GROWTHOS_READ_CONTRACT.md'
     ],
     cohort: {
       dormancyWindow: 'EXPLICIT_CALLER_SUPPLIED_DAYS',
