@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growthos.local/schemas/policy-decision-receipt.schema.json",
+  "title": "GrowthOS Policy Decision Receipt",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "receiptId",
+    "tenantId",
+    "actionId",
+    "actionHash",
+    "envelopeId",
+    "envelopeHash",
+    "decision",
+    "reasons",
+    "evaluatedAt",
+    "autonomyLevel",
+    "summary",
+    "receiptHash"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "receiptId": { "type": "string", "minLength": 1 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "actionId": { "type": "string", "minLength": 1 },
+    "actionHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "envelopeId": { "type": "string", "minLength": 1 },
+    "envelopeHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "decision": { "enum": ["ALLOW", "REQUIRE_APPROVAL", "DENY", "NO_ACTION"] },
+    "reasons": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+    "evaluatedAt": { "type": "string", "format": "date-time" },
+    "autonomyLevel": { "enum": ["L0_OBSERVE", "L1_RECOMMEND", "L2_DRAFT", "L3_APPROVAL_REQUIRED", "L4_BOUNDED_AUTONOMOUS", "L5_LOW_RISK_AUTONOMOUS"] },
+    "summary": {
+      "type": "object",
+      "required": ["actionFamily", "actionType", "channel", "accountId", "geography", "expectedSpendUsd", "expectedRecipients"],
+      "properties": {
+        "actionFamily": { "type": "string", "minLength": 1 },
+        "actionType": { "type": "string", "minLength": 1 },
+        "channel": { "type": ["string", "null"] },
+        "accountId": { "type": ["string", "null"] },
+        "geography": { "type": ["string", "null"] },
+        "expectedSpendUsd": { "type": ["number", "null"], "minimum": 0 },
+        "expectedRecipients": { "type": ["integer", "null"], "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "receiptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false
+}
