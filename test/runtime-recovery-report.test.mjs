@@ -64,7 +64,7 @@ test('approved/observing work and expired-but-still-active envelope require dete
   const report = await buildTenantRecoveryReport({ store, tenantId: 'tenant-1', now: NOW });
   assert.equal(report.summary.blockingCount, 0);
   assert.equal(report.summary.attentionCount, 3);
-  assert.equal(report.safeForUnattendedRecovery, true);
+  assert.equal(report.safeForUnattendedRecovery, false);
   assert.equal(report.requiresHumanOrDeterministicRevalidation, true);
 });
 
