@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growthos.local/schemas/capacity-source-authority.schema.json",
+  "title": "GrowthOS Capacity Source Authority",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "authorityId",
+    "tenantId",
+    "sourceSystem",
+    "sourceAuthority",
+    "status",
+    "validFrom",
+    "validUntil",
+    "scopeKeys",
+    "permissions",
+    "evidenceRef"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "authorityId": { "type": "string", "minLength": 1 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "sourceSystem": { "type": "string", "minLength": 1 },
+    "sourceAuthority": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["ACTIVE", "REVOKED", "EXPIRED"] },
+    "validFrom": { "type": "string", "format": "date-time" },
+    "validUntil": { "type": "string", "format": "date-time" },
+    "scopeKeys": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "permissions": {
+      "type": "object",
+      "required": ["canAssertAvailability", "canAssertConstraints"],
+      "properties": {
+        "canAssertAvailability": { "type": "boolean" },
+        "canAssertConstraints": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "evidenceRef": { "type": "string", "minLength": 1 },
+    "notes": { "type": "string" }
+  },
+  "additionalProperties": false
+}
