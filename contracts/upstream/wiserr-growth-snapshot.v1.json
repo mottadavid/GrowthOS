@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "dependencyId": "wiserr-growth-snapshot-v1",
+  "system": "WISERR_OS",
+  "repository": "mottadavid/Wiserr-OS",
+  "contractName": "wiserr-growth-snapshot",
+  "contractVersion": "1",
+  "status": "CANDIDATE",
+  "validatedCommitSha": "34325851a510a7595520e68424e9f6a4ef710066",
+  "authorityFingerprint": "567aee8374298ed4b8fa6d14aa2a71bb26337c2d74dfce7f11ab4e2510811bd2",
+  "validatedAt": "2026-08-18T19:47:00.000Z",
+  "validUntil": null,
+  "guardedPaths": [
+    "server/growth/growthSnapshotService.ts",
+    "tests/growth/growthSnapshotService.test.ts",
+    "docs/growth/GROWTHOS_WISERR_AUTHORITY_CONTRACT.md",
+    "server/routes/tenantInfoRoutes.ts",
+    "server/index.ts"
+  ],
+  "capabilities": {
+    "aggregateGrowthSnapshotProducer": true,
+    "readGrowthSnapshot": false,
+    "reactivationSmsExecution": false,
+    "reactivationEmailExecution": false,
+    "lunaCampaignContext": false,
+    "canonicalBookingOutcomeEvents": false,
+    "canonicalWonRevenueOutcomeEvents": false
+  },
+  "evidence": [
+    {
+      "kind": "GITHUB_PR",
+      "reference": "mottadavid/Wiserr-OS#1687",
+      "summary": "Draft producer/domain slice for aggregate GrowthOS planning state; not mounted as a certified read API."
+    },
+    {
+      "kind": "AUTHORITY_AUDIT",
+      "reference": "server/stores/postgres/postgresLeadStore.ts",
+      "summary": "Wiserr remains authoritative for lead identity, stage, per-channel opt-outs, and global do-not-contact state."
+    },
+    {
+      "kind": "AUTHORITY_AUDIT",
+      "reference": "server/messaging/sendTenantSms.ts",
+      "summary": "Wiserr remains the sole blessed outbound SMS authority; existing purposes do not certify GrowthOS marketing reactivation."
+    }
+  ],
+  "notes": "Candidate only. GrowthOS must not require readGrowthSnapshot or any execution capability from this receipt until the upstream contract is merged, mounted behind certified auth, re-fingerprinted, and promoted to CERTIFIED. Operational capacity remains UNKNOWN until a vertical-specific or universal capacity authority is proven."
+}
