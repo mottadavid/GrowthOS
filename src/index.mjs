@@ -139,6 +139,18 @@ export {
   expireDurableActionEnvelope,
   replaceDurableActionEnvelope
 } from './runtime/action-envelope-repository.mjs';
+export {
+  EXPERIMENT_RECORD_TYPE,
+  loadDurableExperiment,
+  listDurableExperiments,
+  createDurableExperiment,
+  approveDurableExperiment,
+  startDurableExperiment,
+  markDurableExperimentObserving,
+  evaluateDurableExperiment,
+  evaluateAndCloseDurableExperiment,
+  markDurableExperimentReconciliationRequired
+} from './runtime/experiment-repository.mjs';
 export { resolveGrowthOsDatabaseConfig } from './runtime/config.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
