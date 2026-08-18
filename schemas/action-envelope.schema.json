@@ -30,6 +30,7 @@
     },
     "requiresApproval": { "type": "boolean" },
     "approvalId": { "type": ["string", "null"] },
+    "approvedActionHash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
     "policyVersion": { "type": "string" },
     "notes": { "type": "string" }
   },
