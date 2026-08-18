@@ -114,6 +114,8 @@ test('completed durable attempt remains recoverable with its external execution 
 test('action-scoped index ignores large unrelated tenant history', async () => {
   const store = new AtomicInMemoryRuntimeStore();
   const target = await createDurableExecutionAttempt({ store, action: action('target-action'), maxAttempts: 1, now: T0 });
+  await markDurableExecutionSubmitting({ store, tenantId: 'tenant-1', attemptId: target.recordId, now: new Date('2026-08-18T20:00:01Z') });
+  await markDurableExecutionCompleted({ store, tenantId: 'tenant-1', attemptId: target.recordId, result: {}, now: new Date('2026-08-18T20:00:02Z') });
 
   for (let i = 0; i < 1100; i += 1) {
     const unrelated = action(`other-${i}`);
@@ -121,13 +123,14 @@ test('action-scoped index ignores large unrelated tenant history', async () => {
       store,
       action: unrelated,
       maxAttempts: 1,
-      now: new Date(T0.getTime() + (i + 1) * 1000)
+      now: new Date(T0.getTime() + (i + 3) * 1000)
     });
   }
 
   const targetHistory = await listDurableExecutionAttempts({ store, tenantId: 'tenant-1', actionId: 'target-action', limit: 10 });
   assert.equal(targetHistory.length, 1);
   assert.equal(targetHistory[0].recordId, target.recordId);
+  assert.equal(targetHistory[0].payload.state, 'COMPLETED');
 
   await assert.rejects(
     () => createDurableExecutionAttempt({ store, action: action('target-action'), maxAttempts: 1, now: new Date('2026-08-18T21:00:00Z') }),
