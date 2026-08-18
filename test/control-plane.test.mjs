@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { actionApprovalHash } from '../src/core/canonical.mjs';
 import { CONTROL_DECISIONS, evaluateActionPolicy } from '../src/core/control-plane.mjs';
 
 const NOW = new Date('2026-08-18T19:00:00.000Z');
@@ -26,6 +27,7 @@ function envelope(overrides = {}) {
     },
     requiresApproval: false,
     approvalId: null,
+    approvedActionHash: null,
     policyVersion: 'v1',
     notes: '',
     ...overrides
@@ -119,12 +121,37 @@ test('denies recipient and attempt ceiling breaches', () => {
 });
 
 test('L3 action requires exact approval and then allows it', () => {
-  const env = envelope({ autonomyLevel: 'L3_APPROVAL_REQUIRED', requiresApproval: true, approvalId: 'approval-1' });
+  const candidate = action({ approvalId: 'approval-1' });
+  const env = envelope({
+    autonomyLevel: 'L3_APPROVAL_REQUIRED',
+    requiresApproval: true,
+    approvalId: 'approval-1',
+    approvedActionHash: actionApprovalHash(candidate)
+  });
+
   const pending = evaluateActionPolicy({ action: action(), envelope: env, now: NOW });
   assert.equal(pending.decision, CONTROL_DECISIONS.REQUIRE_APPROVAL);
 
-  const approved = evaluateActionPolicy({ action: action({ approvalId: 'approval-1' }), envelope: env, now: NOW });
+  const approved = evaluateActionPolicy({ action: candidate, envelope: env, now: NOW });
   assert.equal(approved.decision, CONTROL_DECISIONS.ALLOW);
+});
+
+test('approval is invalidated when an approval-bound action changes', () => {
+  const approvedAction = action({ approvalId: 'approval-1' });
+  const env = envelope({
+    autonomyLevel: 'L3_APPROVAL_REQUIRED',
+    requiresApproval: true,
+    approvalId: 'approval-1',
+    approvedActionHash: actionApprovalHash(approvedAction)
+  });
+
+  const mutated = action({
+    approvalId: 'approval-1',
+    expectedCost: { spendUsd: 15, recipients: 100 }
+  });
+  const result = evaluateActionPolicy({ action: mutated, envelope: env, now: NOW });
+  assert.equal(result.decision, CONTROL_DECISIONS.REQUIRE_APPROVAL);
+  assert.ok(result.reasons.includes('APPROVED_ACTION_CHANGED'));
 });
 
 test('non-executable L0-L2 envelopes never execute', () => {
