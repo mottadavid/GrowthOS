@@ -1,3 +1,4 @@
+import { actionApprovalHash } from './canonical.mjs';
 import { validateActionEnvelope, validateActionRequest, validateBusinessState } from './validators.mjs';
 
 export const CONTROL_DECISIONS = Object.freeze({
@@ -107,15 +108,31 @@ export function evaluateActionPolicy({ action, envelope, businessState = null, n
 
   const approvalRequired = envelope.autonomyLevel === 'L3_APPROVAL_REQUIRED' || envelope.requiresApproval === true || approvalReasons.length > 0;
   if (approvalRequired) {
-    if (!action.approvalId || !envelope.approvalId || action.approvalId !== envelope.approvalId) {
-      return decision(CONTROL_DECISIONS.REQUIRE_APPROVAL, approvalReasons.length ? approvalReasons : ['EXPLICIT_APPROVAL_REQUIRED'], {
-        envelopeId: envelope.envelopeId
+    const exactHash = actionApprovalHash(action);
+    const approvalMatches = Boolean(
+      action.approvalId &&
+      envelope.approvalId &&
+      action.approvalId === envelope.approvalId &&
+      envelope.approvedActionHash &&
+      envelope.approvedActionHash === exactHash
+    );
+
+    if (!approvalMatches) {
+      const reasons = approvalReasons.length ? approvalReasons : ['EXPLICIT_APPROVAL_REQUIRED'];
+      if (action.approvalId && envelope.approvalId && action.approvalId === envelope.approvalId && envelope.approvedActionHash && envelope.approvedActionHash !== exactHash) {
+        reasons.push('APPROVED_ACTION_CHANGED');
+      }
+      return decision(CONTROL_DECISIONS.REQUIRE_APPROVAL, reasons, {
+        envelopeId: envelope.envelopeId,
+        currentActionHash: exactHash,
+        approvedActionHash: envelope.approvedActionHash ?? null
       });
     }
   }
 
   return decision(CONTROL_DECISIONS.ALLOW, ['ACTION_WITHIN_ACTIVE_ENVELOPE'], {
     envelopeId: envelope.envelopeId,
-    autonomyLevel: envelope.autonomyLevel
+    autonomyLevel: envelope.autonomyLevel,
+    actionHash: actionApprovalHash(action)
   });
 }
