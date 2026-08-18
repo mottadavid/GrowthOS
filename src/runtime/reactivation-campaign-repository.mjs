@@ -13,6 +13,7 @@ import {
 } from '../reactivation/campaign.mjs';
 import { reactivationPlanApprovalHash } from '../reactivation/plan.mjs';
 import { validateWiserrReactivationCommand } from '../reactivation/wiserr-command.mjs';
+import { sha256Canonical } from '../core/canonical.mjs';
 import { mutateAuthoritativeRuntimeState } from './atomic-store.mjs';
 
 export const REACTIVATION_CAMPAIGN_RECORD_TYPE = 'reactivation_campaign';
@@ -81,6 +82,41 @@ function eventPayload(campaign, extra = {}) {
     attemptCount: Array.isArray(campaign.attemptIds) ? campaign.attemptIds.length : 0,
     ...clone(extra)
   };
+}
+
+function assertCommandMatchesCampaign(campaign, command) {
+  const plan = campaign.plan;
+  if (command.tenantId !== campaign.tenantId || command.campaignId !== campaign.campaignId) {
+    throw new Error('DURABLE_REACTIVATION_COMMAND_CAMPAIGN_MISMATCH');
+  }
+  if (command.planId !== plan.planId || command.planApprovalHash !== plan.approvalHash) {
+    throw new Error('DURABLE_REACTIVATION_COMMAND_PLAN_MISMATCH');
+  }
+  if (campaign.approval?.approvalId !== command.campaignApprovalId) {
+    throw new Error('DURABLE_REACTIVATION_COMMAND_APPROVAL_MISMATCH');
+  }
+  if (command.opportunityId !== plan.opportunityId) {
+    throw new Error('DURABLE_REACTIVATION_COMMAND_OPPORTUNITY_MISMATCH');
+  }
+  if (command.originalBusinessSnapshotId !== plan.businessSnapshotId) {
+    throw new Error('DURABLE_REACTIVATION_COMMAND_SNAPSHOT_MISMATCH');
+  }
+  if (
+    command.cohortDefinitionId !== plan.cohort?.definitionId ||
+    command.cohortDefinitionVersion !== plan.cohort?.definitionVersion
+  ) {
+    throw new Error('DURABLE_REACTIVATION_COMMAND_COHORT_MISMATCH');
+  }
+  if (command.channel !== plan.channel) {
+    throw new Error('DURABLE_REACTIVATION_COMMAND_CHANNEL_MISMATCH');
+  }
+  if (sha256Canonical(command.message) !== sha256Canonical(plan.message)) {
+    throw new Error('DURABLE_REACTIVATION_COMMAND_MESSAGE_MISMATCH');
+  }
+  if (!Number.isInteger(command.maxRecipients) || command.maxRecipients < 1 || command.maxRecipients > plan.cohort.plannedMaxRecipients) {
+    throw new Error('DURABLE_REACTIVATION_COMMAND_RECIPIENT_CEILING_INVALID');
+  }
+  return true;
 }
 
 export async function loadDurableReactivationCampaign({ store, tenantId, campaignId }) {
@@ -214,17 +250,13 @@ export function approveDurableReactivationCampaign({
 
 export function startDurableReactivationCampaignFromCommand({ store, tenantId, campaignId, command, now = new Date() }) {
   validateWiserrReactivationCommand(command);
-  if (command.tenantId !== tenantId || command.campaignId !== campaignId) {
-    throw new Error('DURABLE_REACTIVATION_COMMAND_CAMPAIGN_MISMATCH');
-  }
   return transition({
     store,
     tenantId,
     campaignId,
     now,
     apply: campaign => {
-      if (campaign.plan.approvalHash !== command.planApprovalHash) throw new Error('DURABLE_REACTIVATION_COMMAND_PLAN_MISMATCH');
-      if (campaign.approval?.approvalId !== command.campaignApprovalId) throw new Error('DURABLE_REACTIVATION_COMMAND_APPROVAL_MISMATCH');
+      assertCommandMatchesCampaign(campaign, command);
       return startReactivationCampaign(campaign, { attemptId: command.attemptId, now });
     },
     eventExtra: {
