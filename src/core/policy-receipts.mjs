@@ -30,7 +30,7 @@ export function approvalBoundEnvelope(envelope) {
     limits: envelope.limits,
     requiresApproval: envelope.requiresApproval === true,
     approvalId: envelope.approvalId ?? null,
-    approvalHash: envelope.approvalHash ?? null,
+    approvedActionHash: envelope.approvedActionHash ?? null,
     policyVersion: envelope.policyVersion ?? null
   };
 }
