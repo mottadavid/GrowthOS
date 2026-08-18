@@ -31,6 +31,12 @@ export {
   upstreamAuthorityLockFingerprint,
   evaluateUpstreamAuthority
 } from './core/upstream-authority.mjs';
+export {
+  CAPACITY_STATUSES,
+  validateCapacityEvidence,
+  deriveCapacityState,
+  capacityForBusinessState
+} from './core/capacity-evidence.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
 export { approvalBoundReactivationPlan, reactivationPlanApprovalHash, buildReactivationPlan, assertApprovedReactivationPlan, buildWiserrReactivationExecutionRequest } from './reactivation/plan.mjs';
