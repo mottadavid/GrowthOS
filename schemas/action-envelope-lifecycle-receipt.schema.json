@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growthos.local/schemas/action-envelope-lifecycle-receipt.schema.json",
+  "title": "GrowthOS Action Envelope Lifecycle Receipt",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "receiptId",
+    "operation",
+    "tenantId",
+    "envelopeId",
+    "envelopeHash",
+    "assertionId",
+    "subjectId",
+    "issuerAuthorityRef",
+    "occurredAt",
+    "receiptHash"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "receiptId": { "type": "string", "minLength": 1 },
+    "operation": { "enum": ["ACTIVATE", "REVOKE", "EXPIRE", "REVISE"] },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "envelopeId": { "type": "string", "minLength": 1 },
+    "envelopeHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "assertionId": { "type": ["string", "null"] },
+    "subjectId": { "type": ["string", "null"] },
+    "issuerAuthorityRef": { "type": ["string", "null"] },
+    "parentEnvelopeId": { "type": ["string", "null"] },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "receiptHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "additionalProperties": false
+}
