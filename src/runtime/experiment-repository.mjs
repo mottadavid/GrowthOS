@@ -1,3 +1,4 @@
+import { sha256Canonical } from '../core/canonical.mjs';
 import {
   EXPERIMENT_STATES,
   createExperiment,
@@ -93,7 +94,7 @@ export async function createDurableExperiment({ store, input, now = new Date() }
   const experiment = input?.state === 'DRAFT' ? validateExperimentPayload(clone(input)) : createExperiment({ ...input, createdAt: input?.createdAt ?? now });
   const existing = await loadDurableExperiment({ store, tenantId: experiment.tenantId, experimentId: experiment.experimentId });
   if (existing) {
-    if (JSON.stringify(existing.payload) !== JSON.stringify(experiment)) throw new Error('DURABLE_EXPERIMENT_ID_CONFLICT');
+    if (sha256Canonical(existing.payload) !== sha256Canonical(experiment)) throw new Error('DURABLE_EXPERIMENT_ID_CONFLICT');
     return { record: existing, idempotent: true };
   }
 
