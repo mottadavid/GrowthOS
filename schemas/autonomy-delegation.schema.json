@@ -14,7 +14,7 @@
     "validFrom",
     "validUntil",
     "actionFamilies",
-    "maxAutonomyLevel",
+    "allowedAutonomyLevels",
     "scopes",
     "limitCeilings",
     "canActivateEnvelopes",
@@ -36,8 +36,13 @@
       "uniqueItems": true,
       "items": { "type": "string", "minLength": 1 }
     },
-    "maxAutonomyLevel": {
-      "enum": ["L0_OBSERVE", "L1_RECOMMEND", "L2_DRAFT", "L3_APPROVAL_REQUIRED", "L4_BOUNDED_AUTONOMOUS", "L5_LOW_RISK_AUTONOMOUS"]
+    "allowedAutonomyLevels": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": ["L0_OBSERVE", "L1_RECOMMEND", "L2_DRAFT", "L3_APPROVAL_REQUIRED", "L4_BOUNDED_AUTONOMOUS", "L5_LOW_RISK_AUTONOMOUS"]
+      }
     },
     "scopes": {
       "type": "object",
