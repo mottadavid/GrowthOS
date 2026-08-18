@@ -113,6 +113,21 @@ export {
   markDurableExecutionReconciliationRequired,
   reconcileDurableExecutionAttempt
 } from './runtime/execution-attempt-repository.mjs';
+export {
+  REACTIVATION_CAMPAIGN_RECORD_TYPE,
+  durableCampaignIdForPlan,
+  loadDurableReactivationCampaign,
+  listDurableReactivationCampaigns,
+  createDurableReactivationCampaign,
+  submitDurableReactivationCampaignForApproval,
+  approveDurableReactivationCampaign,
+  startDurableReactivationCampaignFromCommand,
+  markDurableReactivationCampaignObserving,
+  markDurableReactivationCampaignReconciliationRequired,
+  stopDurableReactivationCampaign,
+  failDurableReactivationCampaign,
+  completeDurableReactivationCampaign
+} from './runtime/reactivation-campaign-repository.mjs';
 export { resolveGrowthOsDatabaseConfig } from './runtime/config.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
