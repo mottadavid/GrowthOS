@@ -6,6 +6,11 @@ function requiredString(value, label) {
   return value;
 }
 
+function optionalString(value, label) {
+  if (value === null || value === undefined) return null;
+  return requiredString(value, label);
+}
+
 function validDate(value, label) {
   const date = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(date.getTime())) throw new Error(`${label} must be a valid date/time.`);
@@ -29,6 +34,7 @@ function rowToRecord(row) {
     tenantId: row.tenant_id,
     recordType: row.record_type,
     recordId: row.record_id,
+    indexKey: row.index_key ?? null,
     revision: Number(row.revision),
     payload: row.payload,
     payloadHash: row.payload_hash,
@@ -67,7 +73,7 @@ export class PostgresRuntimeStore {
     requiredString(recordType, 'recordType');
     requiredString(recordId, 'recordId');
     const result = await this.query(
-      `SELECT tenant_id, record_type, record_id, revision, payload, payload_hash, created_at, updated_at
+      `SELECT tenant_id, record_type, record_id, index_key, revision, payload, payload_hash, created_at, updated_at
          FROM growthos_records
         WHERE tenant_id = $1 AND record_type = $2 AND record_id = $3`,
       [tenantId, recordType, recordId]
@@ -75,25 +81,29 @@ export class PostgresRuntimeStore {
     return rowToRecord(result.rows?.[0] ?? null);
   }
 
-  async listRecords({ tenantId, recordType, limit = 1000 }) {
+  async listRecords({ tenantId, recordType, indexKey = null, limit = 1000 }) {
     requiredString(tenantId, 'tenantId');
     requiredString(recordType, 'recordType');
+    optionalString(indexKey, 'indexKey');
     validateLimit(limit);
     const result = await this.query(
-      `SELECT tenant_id, record_type, record_id, revision, payload, payload_hash, created_at, updated_at
+      `SELECT tenant_id, record_type, record_id, index_key, revision, payload, payload_hash, created_at, updated_at
          FROM growthos_records
-        WHERE tenant_id = $1 AND record_type = $2
+        WHERE tenant_id = $1
+          AND record_type = $2
+          AND ($3::text IS NULL OR index_key = $3)
         ORDER BY updated_at DESC, record_id ASC
-        LIMIT $3`,
-      [tenantId, recordType, limit]
+        LIMIT $4`,
+      [tenantId, recordType, indexKey, limit]
     );
     return (result.rows || []).map(rowToRecord);
   }
 
-  async putRecord({ tenantId, recordType, recordId, payload, expectedRevision, now = new Date() }) {
+  async putRecord({ tenantId, recordType, recordId, indexKey = null, payload, expectedRevision, now = new Date() }) {
     requiredString(tenantId, 'tenantId');
     requiredString(recordType, 'recordType');
     requiredString(recordId, 'recordId');
+    optionalString(indexKey, 'indexKey');
     if (!Number.isInteger(expectedRevision) || expectedRevision < 0) throw new Error('expectedRevision must be a non-negative integer.');
     const timestamp = validDate(now, 'now');
     const payloadHash = runtimePayloadHash(payload);
@@ -101,11 +111,11 @@ export class PostgresRuntimeStore {
     if (expectedRevision === 0) {
       const result = await this.query(
         `INSERT INTO growthos_records
-           (tenant_id, record_type, record_id, revision, payload, payload_hash, created_at, updated_at)
-         VALUES ($1, $2, $3, 1, $4::jsonb, $5, $6::timestamptz, $6::timestamptz)
+           (tenant_id, record_type, record_id, index_key, revision, payload, payload_hash, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 1, $5::jsonb, $6, $7::timestamptz, $7::timestamptz)
          ON CONFLICT (tenant_id, record_type, record_id) DO NOTHING
-         RETURNING tenant_id, record_type, record_id, revision, payload, payload_hash, created_at, updated_at`,
-        [tenantId, recordType, recordId, JSON.stringify(payload), payloadHash, timestamp]
+         RETURNING tenant_id, record_type, record_id, index_key, revision, payload, payload_hash, created_at, updated_at`,
+        [tenantId, recordType, recordId, indexKey, JSON.stringify(payload), payloadHash, timestamp]
       );
       if (!result.rows?.[0]) throw runtimeError('RUNTIME_RECORD_REVISION_CONFLICT');
       return rowToRecord(result.rows[0]);
@@ -121,8 +131,9 @@ export class PostgresRuntimeStore {
           AND record_type = $2
           AND record_id = $3
           AND revision = $7
-      RETURNING tenant_id, record_type, record_id, revision, payload, payload_hash, created_at, updated_at`,
-      [tenantId, recordType, recordId, JSON.stringify(payload), payloadHash, timestamp, expectedRevision]
+          AND ($8::text IS NULL OR index_key = $8)
+      RETURNING tenant_id, record_type, record_id, index_key, revision, payload, payload_hash, created_at, updated_at`,
+      [tenantId, recordType, recordId, JSON.stringify(payload), payloadHash, timestamp, expectedRevision, indexKey]
     );
     if (!result.rows?.[0]) throw runtimeError('RUNTIME_RECORD_REVISION_CONFLICT');
     return rowToRecord(result.rows[0]);
