@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growthos.local/schemas/execution-attempt.schema.json",
+  "title": "GrowthOS Execution Attempt",
+  "type": "object",
+  "required": ["schemaVersion", "attemptId", "tenantId", "actionId", "actionHash", "attemptNumber", "idempotencyKey", "state", "createdAt", "events"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "attemptId": { "type": "string", "minLength": 1 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "actionId": { "type": "string", "minLength": 1 },
+    "actionHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "attemptNumber": { "type": "integer", "minimum": 1 },
+    "idempotencyKey": { "type": "string", "minLength": 1 },
+    "state": { "enum": ["CREATED", "SUBMITTING", "ACCEPTED", "COMPLETED", "DEFINITIVE_FAILURE", "RECONCILIATION_REQUIRED", "RECONCILED_COMPLETED", "RECONCILED_FAILED", "NOT_ACCEPTED"] },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": ["string", "null"], "format": "date-time" },
+    "externalExecutionId": { "type": ["string", "null"] },
+    "result": { "type": ["object", "null"] },
+    "error": { "type": ["object", "null"] },
+    "reconciliation": { "type": ["object", "null"] },
+    "events": { "type": "array", "items": { "type": "object" } }
+  },
+  "additionalProperties": false
+}
