@@ -38,6 +38,14 @@ export {
   capacityForBusinessState
 } from './core/capacity-evidence.mjs';
 export {
+  CAPACITY_AUTHORITY_STATES,
+  CAPACITY_AUTHORITY_DECISIONS,
+  validateCapacitySourceAuthority,
+  capacitySourceAuthorityHash,
+  evaluateCapacitySourceAuthority,
+  deriveCapacityStateWithAuthority
+} from './core/capacity-source-authority.mjs';
+export {
   approvalBoundEnvelope,
   envelopeAuthorityHash,
   policyReceiptHash,
