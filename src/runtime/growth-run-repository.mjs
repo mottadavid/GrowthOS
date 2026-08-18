@@ -4,7 +4,6 @@ import { loadDurableWiserrGrowthSnapshot } from './wiserr-snapshot-repository.mj
 import { loadDurableReactivationOpportunityEvaluation } from './reactivation-opportunity-repository.mjs';
 import { loadDurableReactivationCampaign } from './reactivation-campaign-repository.mjs';
 import { loadDurableExperiment } from './experiment-repository.mjs';
-import { loadDurableActionEnvelope } from './action-envelope-repository.mjs';
 import { loadDurablePolicyAuthorization } from './policy-authorization-repository.mjs';
 import { loadDurableExecutionAttempt } from './execution-attempt-repository.mjs';
 import { listDurableBusinessOutcomes } from './business-outcome-repository.mjs';
@@ -37,6 +36,8 @@ function validateRecord(record, tenantId) {
     throw new Error('DURABLE_GROWTH_RUN_MANIFEST_IDENTITY_MISMATCH');
   }
   if (record.payload.manifestHash !== manifest.manifestHash) throw new Error('DURABLE_GROWTH_RUN_MANIFEST_HASH_MISMATCH');
+  if (!/^[0-9a-f]{64}$/.test(record.payload.sourceProofHash || '')) throw new Error('DURABLE_GROWTH_RUN_SOURCE_PROOF_HASH_INVALID');
+  if (sha256Canonical(record.payload.sourceProof) !== record.payload.sourceProofHash) throw new Error('DURABLE_GROWTH_RUN_SOURCE_PROOF_MISMATCH');
   return record;
 }
 
@@ -94,10 +95,6 @@ export async function buildAndPersistDurableGrowthRunManifest({
     () => loadDurableExperiment({ store, tenantId, experimentId }),
     'DURABLE_GROWTH_RUN_EXPERIMENT_NOT_FOUND'
   );
-  const envelopeRecord = await requireRecord(
-    () => loadDurableActionEnvelope({ store, tenantId, envelopeId }),
-    'DURABLE_GROWTH_RUN_ENVELOPE_NOT_FOUND'
-  );
   const policyRecord = await requireRecord(
     () => loadDurablePolicyAuthorization({ store, tenantId, receiptId: policyReceiptId }),
     'DURABLE_GROWTH_RUN_POLICY_NOT_FOUND'
@@ -111,9 +108,12 @@ export async function buildAndPersistDurableGrowthRunManifest({
   const opportunity = opportunityRecord.payload.result.opportunity;
   const campaign = campaignRecord.payload;
   const experiment = experimentRecord.payload;
-  const envelope = envelopeRecord.payload;
+  const envelope = policyRecord.payload.envelope;
   const attempt = attemptRecord.payload;
   const policyReceipt = policyRecord.payload.receipt;
+  if (envelope.envelopeId !== envelopeId || policyRecord.payload.envelopeId !== envelopeId) {
+    throw new Error('DURABLE_GROWTH_RUN_POLICY_ENVELOPE_MISMATCH');
+  }
   const resolvedRunId = runId || `growth-run-${action.actionId}`;
 
   const correlations = [...new Set([resolvedRunId, campaign.campaignId, experiment.experimentId, action.actionId])];
@@ -141,8 +141,8 @@ export async function buildAndPersistDurableGrowthRunManifest({
     opportunityRecordHash: sha256Canonical(opportunityRecord.payload),
     campaignRecordHash: sha256Canonical(campaignRecord.payload),
     experimentRecordHash: sha256Canonical(experimentRecord.payload),
-    envelopeRecordHash: sha256Canonical(envelopeRecord.payload),
     policyRecordHash: sha256Canonical(policyRecord.payload),
+    evaluatedEnvelopeHash: policyRecord.payload.envelopeHash,
     attemptRecordHash: sha256Canonical(attemptRecord.payload),
     outcomeRecordHashes: outcomeRecords.map(record => ({ recordId: record.recordId, semanticHash: record.payload.semanticHash })).sort((a, b) => a.recordId.localeCompare(b.recordId))
   };
