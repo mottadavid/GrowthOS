@@ -187,6 +187,12 @@ export {
   listDurableReactivationOpportunityEvaluations,
   evaluateAndPersistDurableReactivationOpportunity
 } from './runtime/reactivation-opportunity-repository.mjs';
+export {
+  GROWTH_RUN_MANIFEST_RECORD_TYPE,
+  loadDurableGrowthRunManifest,
+  listDurableGrowthRunManifests,
+  buildAndPersistDurableGrowthRunManifest
+} from './runtime/growth-run-repository.mjs';
 export { resolveGrowthOsDatabaseConfig } from './runtime/config.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
