@@ -100,6 +100,19 @@ export {
   AtomicPostgresRuntimeStore,
   mutateAuthoritativeRuntimeState
 } from './runtime/atomic-store.mjs';
+export {
+  EXECUTION_ATTEMPT_RECORD_TYPE,
+  loadDurableExecutionAttempt,
+  listDurableExecutionAttempts,
+  createDurableExecutionAttempt,
+  markDurableExecutionSubmitting,
+  markDurableExecutionAccepted,
+  markDurableExecutionCompleted,
+  markDurableExecutionDefinitiveFailure,
+  markDurableExecutionNotAccepted,
+  markDurableExecutionReconciliationRequired,
+  reconcileDurableExecutionAttempt
+} from './runtime/execution-attempt-repository.mjs';
 export { resolveGrowthOsDatabaseConfig } from './runtime/config.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
