@@ -16,6 +16,11 @@ function nonNegativeInteger(value, label) {
   return value;
 }
 
+function validateLimit(value, label = 'limit') {
+  if (!Number.isInteger(value) || value < 1 || value > 10000) throw new Error(`${label} must be an integer between 1 and 10000.`);
+  return value;
+}
+
 function clone(value) {
   return structuredClone(value);
 }
@@ -76,6 +81,24 @@ export class InMemoryRuntimeStore {
     if (!stored) return null;
     validateRuntimeRecord(stored);
     return clone(stored);
+  }
+
+  async listRecords({ tenantId, recordType, limit = 1000 }) {
+    requiredString(tenantId, 'tenantId');
+    requiredString(recordType, 'recordType');
+    validateLimit(limit);
+    return [...this.records.values()]
+      .map((record) => {
+        validateRuntimeRecord(record);
+        return record;
+      })
+      .filter((record) => record.tenantId === tenantId && record.recordType === recordType)
+      .sort((a, b) => {
+        const byUpdated = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
+        return byUpdated || a.recordId.localeCompare(b.recordId);
+      })
+      .slice(0, limit)
+      .map(clone);
   }
 
   async putRecord({ tenantId, recordType, recordId, payload, expectedRevision, now = new Date() }) {
@@ -144,7 +167,7 @@ export class InMemoryRuntimeStore {
   async listEvents({ tenantId, correlationId = null, limit = 1000 }) {
     requiredString(tenantId, 'tenantId');
     if (correlationId !== null) requiredString(correlationId, 'correlationId');
-    if (!Number.isInteger(limit) || limit < 1 || limit > 10000) throw new Error('limit must be an integer between 1 and 10000.');
+    validateLimit(limit);
 
     return [...this.events.values()]
       .map((event) => {
@@ -153,7 +176,7 @@ export class InMemoryRuntimeStore {
       })
       .filter((event) => event.tenantId === tenantId)
       .filter((event) => correlationId === null || event.correlationId === correlationId)
-      .sort((a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt))
+      .sort((a, b) => Date.parse(a.recordedAt) - Date.parse(b.recordedAt) || a.eventId.localeCompare(b.eventId))
       .slice(0, limit)
       .map(clone);
   }
