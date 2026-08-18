@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growthos.local/schemas/growth-event.schema.json",
+  "title": "GrowthOS Event",
+  "type": "object",
+  "required": ["schemaVersion", "eventId", "eventType", "tenantId", "occurredAt", "recordedAt", "correlationId", "sourceSystem", "payload"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "eventId": { "type": "string", "minLength": 1 },
+    "eventType": { "type": "string", "pattern": "^growth\\.[a-z0-9_.-]+$" },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "recordedAt": { "type": "string", "format": "date-time" },
+    "correlationId": { "type": "string", "minLength": 1 },
+    "causationId": { "type": ["string", "null"] },
+    "sourceSystem": { "type": "string", "minLength": 1 },
+    "actor": { "type": ["string", "null"] },
+    "executionCertainty": { "enum": ["CONFIRMED", "DEFINITIVE_FAILURE", "AMBIGUOUS", "NOT_APPLICABLE"] },
+    "attributionConfidence": { "enum": ["DIRECT", "HIGH", "MEDIUM", "LOW", "UNATTRIBUTED", "NOT_APPLICABLE"] },
+    "payload": { "type": "object" }
+  },
+  "additionalProperties": false
+}
