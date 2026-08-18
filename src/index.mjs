@@ -171,6 +171,15 @@ export {
   listDurableWiserrGrowthSnapshots,
   readAndPersistWiserrGrowthSnapshot
 } from './runtime/wiserr-snapshot-repository.mjs';
+export {
+  CAPACITY_BUNDLE_RECORD_TYPE,
+  capacityBundleId,
+  capacityBundleRecoveryIndex,
+  loadDurableCapacityBundle,
+  listDurableCapacityBundles,
+  evaluateAndPersistCapacityBundle,
+  assertCapacityBundleUsableForDemand
+} from './runtime/capacity-bundle-repository.mjs';
 export { resolveGrowthOsDatabaseConfig } from './runtime/config.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
