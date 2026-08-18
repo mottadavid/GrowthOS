@@ -76,6 +76,7 @@ export function approveReactivationCampaign(campaign, {
   approvalId,
   approvedBy,
   approvedPlanHash,
+  approvalAuthorityRef = null,
   approvedAt = new Date(),
   expiresAt = null
 }) {
@@ -83,6 +84,7 @@ export function approveReactivationCampaign(campaign, {
   requiredString(approvalId, 'approvalId');
   requiredString(approvedBy, 'approvedBy');
   requiredString(approvedPlanHash, 'approvedPlanHash');
+  if (approvalAuthorityRef !== null) requiredString(approvalAuthorityRef, 'approvalAuthorityRef');
   const currentHash = reactivationPlanApprovalHash(campaign.plan);
   if (approvedPlanHash !== currentHash || approvedPlanHash !== campaign.plan.approvalHash) {
     throw new Error('APPROVAL_PLAN_HASH_MISMATCH');
@@ -98,6 +100,7 @@ export function approveReactivationCampaign(campaign, {
       approvedBy,
       approvedAt: approvedAtIso,
       approvedPlanHash,
+      approvalAuthorityRef,
       expiresAt: expiresAtIso
     },
     updatedAt: approvedAtIso
