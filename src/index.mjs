@@ -59,6 +59,20 @@ export {
   expireEnvelope,
   envelopeLifecycleReceipt
 } from './core/envelope-lifecycle.mjs';
+export {
+  EXPERIMENT_STATES,
+  EXPERIMENT_DECISIONS,
+  experimentApprovalBody,
+  experimentApprovalHash,
+  createExperiment,
+  approveExperiment,
+  assertExperimentIntegrity,
+  startExperiment,
+  markExperimentObserving,
+  evaluateExperiment,
+  closeExperiment,
+  markExperimentReconciliationRequired
+} from './core/experiments.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
 export { approvalBoundReactivationPlan, reactivationPlanApprovalHash, buildReactivationPlan, assertApprovedReactivationPlan, buildWiserrReactivationExecutionRequest } from './reactivation/plan.mjs';
