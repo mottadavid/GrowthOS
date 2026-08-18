@@ -126,7 +126,8 @@ test('update uses compare-and-swap revision and binds index key without rewritin
   assert.equal(updated.indexKey, 'action-1');
   assert.match(calls[0].text, /AND revision = \$7/);
   assert.match(calls[0].text, /index_key = \$8/);
-  assert.doesNotMatch(calls[0].text, /SET[^]*index_key/s);
+  const setClause = calls[0].text.split(/\bWHERE\b/)[0];
+  assert.doesNotMatch(setClause, /index_key/);
   assert.doesNotMatch(calls[0].text, /ON CONFLICT/);
 });
 
