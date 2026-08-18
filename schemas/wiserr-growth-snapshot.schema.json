@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growthos.local/schemas/wiserr-growth-snapshot.schema.json",
+  "title": "Wiserr Growth Snapshot",
+  "type": "object",
+  "required": ["schemaVersion", "snapshotId", "tenantId", "generatedAt", "completeness", "capacity", "reactivation", "capabilities"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "snapshotId": { "type": "string", "minLength": 1 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "completeness": { "enum": ["COMPLETE_FOR_PURPOSE", "PARTIAL", "STALE", "UNAVAILABLE"] },
+    "capacity": {
+      "type": "object",
+      "required": ["status", "demandThrottleRecommended"],
+      "properties": {
+        "status": { "enum": ["AVAILABLE", "CONSTRAINED", "FULL", "UNKNOWN"] },
+        "demandThrottleRecommended": { "type": "boolean" },
+        "reason": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "reactivation": {
+      "type": "object",
+      "required": ["cohortDefinitionId", "cohortDefinitionVersion", "dormantCount", "eligibleByChannel", "suppressedCount"],
+      "properties": {
+        "cohortDefinitionId": { "type": "string", "minLength": 1 },
+        "cohortDefinitionVersion": { "type": "string", "minLength": 1 },
+        "dormantCount": { "type": "integer", "minimum": 0 },
+        "eligibleByChannel": {
+          "type": "object",
+          "properties": {
+            "sms": { "type": "integer", "minimum": 0 },
+            "email": { "type": "integer", "minimum": 0 },
+            "whatsapp": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "suppressedCount": { "type": "integer", "minimum": 0 },
+        "latestRelevantActivityAt": { "type": ["string", "null"], "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["reactivationSms", "reactivationEmail", "reactivationWhatsapp", "lunaReplyHandling", "bookingOutcomes"],
+      "properties": {
+        "reactivationSms": { "type": "boolean" },
+        "reactivationEmail": { "type": "boolean" },
+        "reactivationWhatsapp": { "type": "boolean" },
+        "lunaReplyHandling": { "type": "boolean" },
+        "bookingOutcomes": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

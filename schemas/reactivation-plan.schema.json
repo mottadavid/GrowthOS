@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growthos.local/schemas/reactivation-plan.schema.json",
+  "title": "GrowthOS Reactivation Plan",
+  "type": "object",
+  "required": ["schemaVersion", "planId", "tenantId", "opportunityId", "businessSnapshotId", "cohort", "channel", "message", "successMetric", "observationHorizonHours", "frequencyPolicy", "execution"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "planId": { "type": "string", "minLength": 1 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "opportunityId": { "type": "string", "minLength": 1 },
+    "businessSnapshotId": { "type": "string", "minLength": 1 },
+    "cohort": {
+      "type": "object",
+      "required": ["definitionId", "definitionVersion", "plannedMaxRecipients"],
+      "properties": {
+        "definitionId": { "type": "string", "minLength": 1 },
+        "definitionVersion": { "type": "string", "minLength": 1 },
+        "plannedMaxRecipients": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "channel": { "enum": ["sms", "email", "whatsapp"] },
+    "message": {
+      "type": "object",
+      "required": ["strategy", "body", "version"],
+      "properties": {
+        "strategy": { "type": "string", "minLength": 1 },
+        "body": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "offerId": { "type": ["string", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "successMetric": { "enum": ["QUALIFIED_REPLY", "BOOKING", "WON_CUSTOMER"] },
+    "observationHorizonHours": { "type": "integer", "minimum": 1 },
+    "frequencyPolicy": {
+      "type": "object",
+      "required": ["maxAttempts", "minHoursBetweenAttempts", "stopOnReply", "stopOnBooking", "stopOnOptOut"],
+      "properties": {
+        "maxAttempts": { "type": "integer", "minimum": 1 },
+        "minHoursBetweenAttempts": { "type": "integer", "minimum": 0 },
+        "stopOnReply": { "type": "boolean" },
+        "stopOnBooking": { "type": "boolean" },
+        "stopOnOptOut": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "execution": {
+      "type": "object",
+      "required": ["authority", "requiresCapability", "attemptNumber"],
+      "properties": {
+        "authority": { "const": "WISERR" },
+        "requiresCapability": { "type": "string", "minLength": 1 },
+        "attemptNumber": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
