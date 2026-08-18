@@ -82,6 +82,11 @@ export {
 } from './core/growth-run.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
+export {
+  evaluateWiserrGrowthSnapshotReadAuthority,
+  validateGrowthSnapshotFreshness,
+  readWiserrGrowthSnapshot
+} from './integrations/wiserr/read-client.mjs';
 export { approvalBoundReactivationPlan, reactivationPlanApprovalHash, buildReactivationPlan, assertApprovedReactivationPlan, buildWiserrReactivationExecutionRequest } from './reactivation/plan.mjs';
 export { buildReactivationPolicyAction } from './reactivation/action.mjs';
 export {
