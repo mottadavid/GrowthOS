@@ -105,7 +105,7 @@ export async function buildTenantRecoveryReport({ store, tenantId, now = new Dat
     tenantId,
     evaluatedAt: current.toISOString(),
     mode: 'READ_ONLY',
-    safeForUnattendedRecovery: coverageComplete && blockingCount === 0 && unresolvedAttemptCount === 0,
+    safeForUnattendedRecovery: coverageComplete && findings.length === 0,
     requiresHumanOrDeterministicRevalidation: !coverageComplete || findings.length > 0,
     summary: {
       blockingCount,
