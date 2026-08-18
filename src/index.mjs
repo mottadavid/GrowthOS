@@ -158,6 +158,13 @@ export {
   evaluateAndPersistPolicyAuthorization,
   assertDurablePolicyAuthorizationMatches
 } from './runtime/policy-authorization-repository.mjs';
+export {
+  BUSINESS_OUTCOME_RECORD_TYPE,
+  durableBusinessOutcomeId,
+  loadDurableBusinessOutcome,
+  listDurableBusinessOutcomes,
+  ingestDurableBusinessOutcome
+} from './runtime/business-outcome-repository.mjs';
 export { resolveGrowthOsDatabaseConfig } from './runtime/config.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
