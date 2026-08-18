@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growthos.local/schemas/reactivation-campaign.schema.json",
+  "title": "GrowthOS Reactivation Campaign",
+  "type": "object",
+  "required": ["schemaVersion", "campaignId", "tenantId", "status", "plan", "createdAt", "updatedAt", "attemptIds"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "campaignId": { "type": "string", "minLength": 1 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "status": {
+      "enum": [
+        "DRAFT",
+        "READY_FOR_APPROVAL",
+        "APPROVED",
+        "EXECUTING",
+        "OBSERVING",
+        "COMPLETED",
+        "STOPPED",
+        "FAILED",
+        "RECONCILIATION_REQUIRED"
+      ]
+    },
+    "plan": { "type": "object" },
+    "approval": {
+      "type": ["object", "null"],
+      "properties": {
+        "approvalId": { "type": "string", "minLength": 1 },
+        "approvedBy": { "type": "string", "minLength": 1 },
+        "approvedAt": { "type": "string", "format": "date-time" },
+        "approvedPlanHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "expiresAt": { "type": ["string", "null"], "format": "date-time" }
+      },
+      "required": ["approvalId", "approvedBy", "approvedAt", "approvedPlanHash", "expiresAt"],
+      "additionalProperties": false
+    },
+    "attemptIds": { "type": "array", "items": { "type": "string", "minLength": 1 }, "uniqueItems": true },
+    "observationStartedAt": { "type": ["string", "null"], "format": "date-time" },
+    "completedAt": { "type": ["string", "null"], "format": "date-time" },
+    "stopReason": { "type": ["string", "null"] },
+    "failureReason": { "type": ["string", "null"] },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" }
+  },
+  "additionalProperties": false
+}
