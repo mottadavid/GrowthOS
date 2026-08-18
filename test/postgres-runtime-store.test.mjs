@@ -48,12 +48,35 @@ test('record reads are tenant/type/id scoped and verify payload hash', async () 
   assert.match(calls[0].text, /tenant_id = \$1 AND record_type = \$2 AND record_id = \$3/);
 });
 
+test('record discovery is always tenant and record-type scoped', async () => {
+  const calls = [];
+  const store = new PostgresRuntimeStore({ query: async (text, values) => {
+    calls.push({ text, values });
+    return { rows: [recordRow({ record_type: 'campaign', record_id: 'campaign-1' })] };
+  }});
+  const records = await store.listRecords({ tenantId: 'tenant-1', recordType: 'campaign', limit: 25 });
+  assert.equal(records.length, 1);
+  assert.deepEqual(calls[0].values, ['tenant-1', 'campaign', 25]);
+  assert.match(calls[0].text, /WHERE tenant_id = \$1 AND record_type = \$2/);
+  assert.match(calls[0].text, /LIMIT \$3/);
+});
+
 test('tampered database record is rejected on read', async () => {
   const store = new PostgresRuntimeStore({ query: async () => ({
     rows: [recordRow({ payload: { status: 'MUTATED' }, payload_hash: '0'.repeat(64) })]
   })});
   await assert.rejects(
     () => store.getRecord({ tenantId: 'tenant-1', recordType: 'envelope', recordId: 'env-1' }),
+    error => error.code === 'RUNTIME_RECORD_HASH_MISMATCH'
+  );
+});
+
+test('tampered database record is rejected during recovery listing', async () => {
+  const store = new PostgresRuntimeStore({ query: async () => ({
+    rows: [recordRow({ record_type: 'campaign', payload: { status: 'MUTATED' }, payload_hash: '0'.repeat(64) })]
+  })});
+  await assert.rejects(
+    () => store.listRecords({ tenantId: 'tenant-1', recordType: 'campaign' }),
     error => error.code === 'RUNTIME_RECORD_HASH_MISMATCH'
   );
 });
