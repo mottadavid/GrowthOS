@@ -6,6 +6,11 @@ function requiredString(value, label) {
   return value;
 }
 
+function optionalString(value, label) {
+  if (value === null || value === undefined) return null;
+  return requiredString(value, label);
+}
+
 function clone(value) {
   return structuredClone(value);
 }
@@ -21,6 +26,7 @@ function normalizeMutation(input) {
   const tenantId = requiredString(input.tenantId, 'mutation.tenantId');
   const recordType = requiredString(input.recordType, 'mutation.recordType');
   const recordId = requiredString(input.recordId, 'mutation.recordId');
+  const indexKey = optionalString(input.indexKey, 'mutation.indexKey');
   if (!Number.isInteger(input.expectedRevision) || input.expectedRevision < 0) {
     throw new Error('mutation.expectedRevision must be a non-negative integer.');
   }
@@ -35,6 +41,7 @@ function normalizeMutation(input) {
     tenantId,
     recordType,
     recordId,
+    indexKey,
     expectedRevision: input.expectedRevision,
     payload: clone(input.payload),
     now: input.now ?? new Date(),
@@ -50,6 +57,7 @@ async function executeMutation(store, mutation) {
     tenantId: mutation.tenantId,
     recordType: mutation.recordType,
     recordId: mutation.recordId,
+    indexKey: mutation.indexKey,
     payload: mutation.payload,
     expectedRevision: mutation.expectedRevision,
     now: mutation.now
