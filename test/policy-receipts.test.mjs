@@ -33,7 +33,7 @@ function envelope(overrides = {}) {
     },
     requiresApproval: false,
     approvalId: null,
-    approvalHash: null,
+    approvedActionHash: null,
     policyVersion: 'v1',
     notes: 'private operator note that must not enter the authority hash',
     ...overrides
@@ -110,6 +110,23 @@ test('envelope authority mutation invalidates an existing policy receipt', () =>
   const e = envelope();
   const receipt = createPolicyDecisionReceipt({ action: a, envelope: e, decision: decisionFor(a, e), evaluatedAt: NOW });
   const changed = envelope({ limits: { ...e.limits, maxRecipients: 250 } });
+  assert.notEqual(envelopeAuthorityHash(e), envelopeAuthorityHash(changed));
+  assert.throws(() => assertPolicyReceiptMatches({ receipt, action: a, envelope: changed }), /POLICY_RECEIPT_ENVELOPE_CHANGED/);
+});
+
+test('approved action hash is part of envelope authority and cannot change after receipt', () => {
+  const a = action();
+  const e = envelope({
+    requiresApproval: true,
+    approvalId: 'approval-1',
+    approvedActionHash: 'a'.repeat(64)
+  });
+  const receipt = createPolicyDecisionReceipt({ action: a, envelope: e, decision: decisionFor(a, e), evaluatedAt: NOW });
+  const changed = envelope({
+    requiresApproval: true,
+    approvalId: 'approval-1',
+    approvedActionHash: 'b'.repeat(64)
+  });
   assert.notEqual(envelopeAuthorityHash(e), envelopeAuthorityHash(changed));
   assert.throws(() => assertPolicyReceiptMatches({ receipt, action: a, envelope: changed }), /POLICY_RECEIPT_ENVELOPE_CHANGED/);
 });
