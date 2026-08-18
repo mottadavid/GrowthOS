@@ -3,7 +3,8 @@ import { evaluateActionPolicy } from '../core/control-plane.mjs';
 import {
   createPolicyDecisionReceipt,
   validatePolicyDecisionReceipt,
-  assertPolicyReceiptMatches
+  assertPolicyReceiptMatches,
+  envelopeAuthorityHash
 } from '../core/policy-receipts.mjs';
 import { validateActionRequest, validateActionEnvelope, validateBusinessState } from '../core/validators.mjs';
 import { mutateAuthoritativeRuntimeState } from './atomic-store.mjs';
@@ -40,15 +41,21 @@ function validateBundle(bundle) {
   if (bundle.schemaVersion !== 1) throw new Error('Unsupported policy authorization schemaVersion.');
   requiredString(bundle.tenantId, 'bundle.tenantId');
   validateActionRequest(bundle.action);
+  validateActionEnvelope(bundle.envelope);
   validatePolicyDecisionReceipt(bundle.receipt);
-  if (bundle.action.tenantId !== bundle.tenantId || bundle.receipt.tenantId !== bundle.tenantId) {
+  if (bundle.action.tenantId !== bundle.tenantId || bundle.envelope.tenantId !== bundle.tenantId || bundle.receipt.tenantId !== bundle.tenantId) {
     throw new Error('DURABLE_POLICY_AUTHORIZATION_TENANT_MISMATCH');
   }
   if (bundle.action.actionId !== bundle.receipt.actionId) throw new Error('DURABLE_POLICY_AUTHORIZATION_ACTION_MISMATCH');
   if (bundle.actionHash !== actionApprovalHash(bundle.action) || bundle.actionHash !== bundle.receipt.actionHash) {
     throw new Error('DURABLE_POLICY_AUTHORIZATION_ACTION_HASH_MISMATCH');
   }
-  if (bundle.envelopeId !== bundle.receipt.envelopeId || bundle.envelopeHash !== bundle.receipt.envelopeHash) {
+  if (
+    bundle.envelopeId !== bundle.envelope.envelopeId ||
+    bundle.envelopeId !== bundle.receipt.envelopeId ||
+    bundle.envelopeHash !== envelopeAuthorityHash(bundle.envelope) ||
+    bundle.envelopeHash !== bundle.receipt.envelopeHash
+  ) {
     throw new Error('DURABLE_POLICY_AUTHORIZATION_ENVELOPE_MISMATCH');
   }
   if (bundle.businessStateHash !== null && !/^[0-9a-f]{64}$/.test(bundle.businessStateHash || '')) {
@@ -129,6 +136,7 @@ export async function evaluateAndPersistPolicyAuthorization({
     tenantId: action.tenantId,
     action: clone(action),
     actionHash: actionApprovalHash(action),
+    envelope: clone(envelope),
     envelopeId: envelope.envelopeId,
     envelopeHash: receipt.envelopeHash,
     businessStateHash: proof.hash,
@@ -173,5 +181,6 @@ export function assertDurablePolicyAuthorizationMatches({ record, action, envelo
   assertPolicyReceiptMatches({ receipt: record.payload.receipt, action, envelope });
   if (record.payload.actionHash !== actionApprovalHash(action)) throw new Error('DURABLE_POLICY_AUTHORIZATION_ACTION_CHANGED');
   if (sha256Canonical(record.payload.action) !== sha256Canonical(action)) throw new Error('DURABLE_POLICY_AUTHORIZATION_ACTION_PAYLOAD_CHANGED');
+  if (sha256Canonical(record.payload.envelope) !== sha256Canonical(envelope)) throw new Error('DURABLE_POLICY_AUTHORIZATION_ENVELOPE_PAYLOAD_CHANGED');
   return true;
 }
