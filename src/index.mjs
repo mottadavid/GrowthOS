@@ -24,6 +24,13 @@ export {
   createOutcomeEvent,
   summarizeOutcomeTrace
 } from './core/growth-events.mjs';
+export {
+  UPSTREAM_AUTHORITY_STATES,
+  UPSTREAM_AUTHORITY_DECISIONS,
+  validateUpstreamAuthorityReceipt,
+  upstreamAuthorityLockFingerprint,
+  evaluateUpstreamAuthority
+} from './core/upstream-authority.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
 export { approvalBoundReactivationPlan, reactivationPlanApprovalHash, buildReactivationPlan, assertApprovedReactivationPlan, buildWiserrReactivationExecutionRequest } from './reactivation/plan.mjs';

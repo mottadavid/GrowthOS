@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growthos.local/schemas/upstream-authority.schema.json",
+  "title": "GrowthOS Upstream Authority Receipt",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "dependencyId",
+    "system",
+    "repository",
+    "contractName",
+    "contractVersion",
+    "status",
+    "validatedCommitSha",
+    "authorityFingerprint",
+    "validatedAt",
+    "guardedPaths",
+    "capabilities"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "dependencyId": { "type": "string", "minLength": 1 },
+    "system": { "enum": ["WISERR_OS", "AI_STUDIO", "OTHER"] },
+    "repository": { "type": "string", "minLength": 1 },
+    "contractName": { "type": "string", "minLength": 1 },
+    "contractVersion": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["OBSERVED", "CANDIDATE", "CERTIFIED", "REVOKED"] },
+    "validatedCommitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "authorityFingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "validatedAt": { "type": "string", "format": "date-time" },
+    "validUntil": { "type": ["string", "null"], "format": "date-time" },
+    "guardedPaths": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": { "type": "boolean" }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "reference"],
+        "properties": {
+          "kind": { "type": "string", "minLength": 1 },
+          "reference": { "type": "string", "minLength": 1 },
+          "summary": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "notes": { "type": "string" }
+  },
+  "additionalProperties": false
+}

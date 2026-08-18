@@ -48,7 +48,21 @@ Before material work read:
 9. `docs/DECISIONS.md`
 10. relevant contract/schema docs
 
-If work touches Wiserr or AI Studio, inspect their current authorities before changing an integration contract.
+### Required cross-repo merge pass
+
+If work touches or depends on Wiserr OS, AI Studio, or another repository, also read `docs/MERGE_COORDINATION.md` and perform its upstream-authority preflight before writing integration code.
+
+At minimum:
+
+- inspect current GrowthOS `main` and open PRs;
+- inspect current upstream `main`;
+- inspect active upstream PRs/trains that may touch the authority;
+- distinguish `OBSERVED`, `CANDIDATE`, and `CERTIFIED` upstream behavior;
+- do not treat a draft/green PR as canonical authority;
+- prefer isolated GrowthOS work when upstream shared surfaces are congested;
+- re-check upstream authority immediately before merge.
+
+A previously inspected upstream behavior is not permission to assume it still exists unchanged.
 
 ## Core doctrines
 
@@ -101,6 +115,10 @@ All reads, decisions, actions, events, budgets, credentials, and outcomes are te
 ### 10. Continuity lives in the repository
 
 Durable architecture, doctrine, schemas, contracts, and decisions belong here, not only in chat.
+
+### 11. Upstream authority must be current
+
+Cross-repo execution capability requires a current, certified upstream authority receipt. If the upstream head moved and the relevant authority fingerprint has not been reverified, review is required. If the required capability is false, absent, or revoked, execution is denied.
 
 ## Autonomy levels
 
