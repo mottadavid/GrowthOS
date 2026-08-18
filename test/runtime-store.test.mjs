@@ -53,6 +53,29 @@ test('tenant identity is part of record key and reads cannot cross tenant bounda
   assert.equal((await store.getRecord({ tenantId: 'tenant-a', recordType: 'experiment', recordId: 'exp-1' })).payload.state, 'RUNNING');
 });
 
+test('tenant-scoped record discovery supports recovery without cross-tenant enumeration', async () => {
+  const store = new InMemoryRuntimeStore();
+  await store.putRecord({ tenantId: 'tenant-1', recordType: 'campaign', recordId: 'c1', payload: { status: 'APPROVED' }, expectedRevision: 0, now: T0 });
+  await store.putRecord({ tenantId: 'tenant-1', recordType: 'campaign', recordId: 'c2', payload: { status: 'EXECUTING' }, expectedRevision: 0, now: T1 });
+  await store.putRecord({ tenantId: 'tenant-1', recordType: 'experiment', recordId: 'e1', payload: { state: 'RUNNING' }, expectedRevision: 0, now: T1 });
+  await store.putRecord({ tenantId: 'tenant-2', recordType: 'campaign', recordId: 'foreign', payload: { status: 'APPROVED' }, expectedRevision: 0, now: T1 });
+
+  const records = await store.listRecords({ tenantId: 'tenant-1', recordType: 'campaign' });
+  assert.deepEqual(records.map(record => record.recordId), ['c2', 'c1']);
+  assert.equal(records.every(record => record.tenantId === 'tenant-1' && record.recordType === 'campaign'), true);
+});
+
+test('recovery discovery verifies every returned record hash', async () => {
+  const store = new InMemoryRuntimeStore();
+  await store.putRecord({ tenantId: 'tenant-1', recordType: 'campaign', recordId: 'c1', payload: { status: 'APPROVED' }, expectedRevision: 0, now: T0 });
+  const key = store.recordKey({ tenantId: 'tenant-1', recordType: 'campaign', recordId: 'c1' });
+  store.records.get(key).payload.status = 'MUTATED';
+  await assert.rejects(
+    () => store.listRecords({ tenantId: 'tenant-1', recordType: 'campaign' }),
+    error => error.code === 'RUNTIME_RECORD_HASH_MISMATCH'
+  );
+});
+
 test('record payload hash is verified on every read', async () => {
   const store = new InMemoryRuntimeStore();
   await store.putRecord({
