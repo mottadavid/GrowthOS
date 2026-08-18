@@ -117,3 +117,8 @@ export {
   failReactivationCampaign,
   completeReactivationCampaign
 } from './reactivation/campaign.mjs';
+export {
+  wiserrReactivationCommandHash,
+  buildWiserrReactivationCommand,
+  validateWiserrReactivationCommand
+} from './reactivation/wiserr-command.mjs';
