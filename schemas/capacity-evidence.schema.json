@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growthos.local/schemas/capacity-evidence.schema.json",
+  "title": "GrowthOS Capacity Evidence",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "evidenceId",
+    "tenantId",
+    "scopeKey",
+    "sourceSystem",
+    "sourceAuthority",
+    "asOf",
+    "completeness",
+    "signals"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "evidenceId": { "type": "string", "minLength": 1 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "scopeKey": { "type": "string", "minLength": 1 },
+    "sourceSystem": { "type": "string", "minLength": 1 },
+    "sourceAuthority": { "type": "string", "minLength": 1 },
+    "sourceContractId": { "type": ["string", "null"] },
+    "asOf": { "type": "string", "format": "date-time" },
+    "validUntil": { "type": ["string", "null"], "format": "date-time" },
+    "completeness": { "enum": ["COMPLETE_FOR_PURPOSE", "PARTIAL", "STALE", "UNAVAILABLE"] },
+    "signals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["signalId", "verdict", "authoritative", "sourceRef"],
+        "properties": {
+          "signalId": { "type": "string", "minLength": 1 },
+          "verdict": { "enum": ["AVAILABLE", "CONSTRAINED", "FULL", "INFORMATIONAL"] },
+          "authoritative": { "type": "boolean" },
+          "sourceRef": { "type": "string", "minLength": 1 },
+          "observedValue": { "type": ["number", "string", "boolean", "null"] },
+          "threshold": { "type": ["number", "string", "null"] },
+          "units": { "type": ["string", "null"] },
+          "summary": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "notes": { "type": "string" }
+  },
+  "additionalProperties": false
+}
