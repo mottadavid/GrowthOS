@@ -14,6 +14,7 @@ function mutation(overrides = {}) {
     tenantId: 'tenant-1',
     recordType: 'campaign',
     recordId: 'campaign-1',
+    indexKey: 'run-1',
     payload: { status: 'EXECUTING' },
     expectedRevision: 0,
     now: T0,
@@ -37,10 +38,11 @@ test('authoritative mutation requires an atomic-capable store', async () => {
   );
 });
 
-test('in-memory atomic mutation writes state and event together', async () => {
+test('in-memory atomic mutation writes indexed state and event together', async () => {
   const store = new AtomicInMemoryRuntimeStore();
   const result = await mutateAuthoritativeRuntimeState({ store, ...mutation() });
   assert.equal(result.record.revision, 1);
+  assert.equal(result.record.indexKey, 'run-1');
   assert.equal(result.record.payload.status, 'EXECUTING');
   assert.equal(result.event.eventId, 'event-1');
   assert.equal(result.event.tenantId, 'tenant-1');
@@ -78,7 +80,7 @@ test('event failure rolls back the state mutation in memory', async () => {
 test('revision conflict does not append an event', async () => {
   const store = new AtomicInMemoryRuntimeStore();
   await store.putRecord({
-    tenantId: 'tenant-1', recordType: 'campaign', recordId: 'campaign-1',
+    tenantId: 'tenant-1', recordType: 'campaign', recordId: 'campaign-1', indexKey: 'run-1',
     payload: { status: 'APPROVED' }, expectedRevision: 0, now: T0
   });
 
@@ -99,7 +101,7 @@ test('atomic mutation refuses a mismatched event tenant', async () => {
   );
 });
 
-test('postgres atomic store executes state and event through the same transaction query', async () => {
+test('postgres atomic store executes indexed state and event through the same transaction query', async () => {
   const calls = [];
   let transactionInvocations = 0;
   const transactionQuery = async (text, values) => {
@@ -107,8 +109,8 @@ test('postgres atomic store executes state and event through the same transactio
     if (/INSERT INTO growthos_records/.test(text)) {
       return {
         rows: [{
-          tenant_id: values[0], record_type: values[1], record_id: values[2], revision: 1,
-          payload: JSON.parse(values[3]), payload_hash: values[4], created_at: values[5], updated_at: values[5]
+          tenant_id: values[0], record_type: values[1], record_id: values[2], index_key: values[3], revision: 1,
+          payload: JSON.parse(values[4]), payload_hash: values[5], created_at: values[6], updated_at: values[6]
         }]
       };
     }
@@ -137,6 +139,7 @@ test('postgres atomic store executes state and event through the same transactio
   assert.match(calls[0].text, /growthos_records/);
   assert.match(calls[1].text, /growthos_events/);
   assert.equal(result.record.revision, 1);
+  assert.equal(result.record.indexKey, 'run-1');
   assert.equal(result.event.eventId, 'event-1');
 });
 

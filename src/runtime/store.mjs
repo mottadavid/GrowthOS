@@ -5,6 +5,11 @@ function requiredString(value, label) {
   return value;
 }
 
+function optionalString(value, label) {
+  if (value === null || value === undefined) return null;
+  return requiredString(value, label);
+}
+
 function validDate(value, label) {
   const date = value instanceof Date ? value : new Date(value);
   if (!Number.isFinite(date.getTime())) throw new Error(`${label} must be a valid date/time.`);
@@ -41,6 +46,7 @@ export function validateRuntimeRecord(record) {
   requiredString(record.tenantId, 'record.tenantId');
   requiredString(record.recordType, 'record.recordType');
   requiredString(record.recordId, 'record.recordId');
+  optionalString(record.indexKey, 'record.indexKey');
   if (!Number.isInteger(record.revision) || record.revision < 1) throw new Error('record.revision must be a positive integer.');
   if (!/^[0-9a-f]{64}$/.test(record.payloadHash || '')) throw new Error('record.payloadHash must be SHA-256 hex.');
   validDate(record.createdAt, 'record.createdAt');
@@ -83,9 +89,10 @@ export class InMemoryRuntimeStore {
     return clone(stored);
   }
 
-  async listRecords({ tenantId, recordType, limit = 1000 }) {
+  async listRecords({ tenantId, recordType, indexKey = null, limit = 1000 }) {
     requiredString(tenantId, 'tenantId');
     requiredString(recordType, 'recordType');
+    optionalString(indexKey, 'indexKey');
     validateLimit(limit);
     return [...this.records.values()]
       .map((record) => {
@@ -93,6 +100,7 @@ export class InMemoryRuntimeStore {
         return record;
       })
       .filter((record) => record.tenantId === tenantId && record.recordType === recordType)
+      .filter((record) => indexKey === null || record.indexKey === indexKey)
       .sort((a, b) => {
         const byUpdated = Date.parse(b.updatedAt) - Date.parse(a.updatedAt);
         return byUpdated || a.recordId.localeCompare(b.recordId);
@@ -101,21 +109,24 @@ export class InMemoryRuntimeStore {
       .map(clone);
   }
 
-  async putRecord({ tenantId, recordType, recordId, payload, expectedRevision, now = new Date() }) {
+  async putRecord({ tenantId, recordType, recordId, indexKey = null, payload, expectedRevision, now = new Date() }) {
     requiredString(tenantId, 'tenantId');
     requiredString(recordType, 'recordType');
     requiredString(recordId, 'recordId');
+    optionalString(indexKey, 'indexKey');
     nonNegativeInteger(expectedRevision, 'expectedRevision');
     const key = this.recordKey({ tenantId, recordType, recordId });
     const existing = this.records.get(key) || null;
     const currentRevision = existing?.revision ?? 0;
     if (currentRevision !== expectedRevision) throw runtimeError('RUNTIME_RECORD_REVISION_CONFLICT');
+    if (existing && indexKey !== null && existing.indexKey !== indexKey) throw runtimeError('RUNTIME_RECORD_INDEX_KEY_IMMUTABLE');
 
     const timestamp = validDate(now, 'now');
     const next = {
       tenantId,
       recordType,
       recordId,
+      indexKey: existing?.indexKey ?? indexKey,
       revision: expectedRevision + 1,
       payload: clone(payload),
       payloadHash: runtimePayloadHash(payload),
