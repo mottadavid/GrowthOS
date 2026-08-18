@@ -38,6 +38,7 @@ export function validateActionEnvelope(envelope) {
   requiredString(envelope.envelopeId, 'envelope.envelopeId');
   requiredString(envelope.tenantId, 'envelope.tenantId');
   requiredString(envelope.actionFamily, 'envelope.actionFamily');
+  if (envelope.delegateSubjectId !== undefined && envelope.delegateSubjectId !== null) requiredString(envelope.delegateSubjectId, 'envelope.delegateSubjectId');
   if (!AUTONOMY_LEVELS.includes(envelope.autonomyLevel)) throw new Error('Invalid envelope.autonomyLevel.');
   if (!['DRAFT', 'ACTIVE', 'REVOKED', 'EXPIRED'].includes(envelope.status)) throw new Error('Invalid envelope.status.');
   const from = validDate(envelope.validFrom, 'envelope.validFrom');

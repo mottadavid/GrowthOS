@@ -38,6 +38,7 @@ export function evaluateActionPolicy({ action, envelope, businessState = null, n
 
   if (action.tenantId !== envelope.tenantId) hardDenials.push('TENANT_MISMATCH');
   if (action.actionFamily !== envelope.actionFamily) hardDenials.push('ACTION_FAMILY_NOT_AUTHORIZED');
+  if (envelope.delegateSubjectId && action.requestedBy !== envelope.delegateSubjectId) hardDenials.push('DELEGATE_SUBJECT_MISMATCH');
   if (businessState && businessState.tenantId !== action.tenantId) hardDenials.push('BUSINESS_STATE_TENANT_MISMATCH');
 
   if (envelope.status !== 'ACTIVE') hardDenials.push(`ENVELOPE_${envelope.status}`);

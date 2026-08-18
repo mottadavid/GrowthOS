@@ -9,6 +9,7 @@
     "envelopeId": { "type": "string", "minLength": 1 },
     "tenantId": { "type": "string", "minLength": 1 },
     "actionFamily": { "type": "string", "minLength": 1 },
+    "delegateSubjectId": { "type": ["string", "null"], "minLength": 1 },
     "autonomyLevel": { "enum": ["L0_OBSERVE", "L1_RECOMMEND", "L2_DRAFT", "L3_APPROVAL_REQUIRED", "L4_BOUNDED_AUTONOMOUS", "L5_LOW_RISK_AUTONOMOUS"] },
     "status": { "enum": ["DRAFT", "ACTIVE", "REVOKED", "EXPIRED"] },
     "validFrom": { "type": "string", "format": "date-time" },
@@ -32,6 +33,15 @@
     "approvalId": { "type": ["string", "null"] },
     "approvedActionHash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
     "policyVersion": { "type": "string" },
+    "authorityAssertionId": { "type": ["string", "null"] },
+    "authorityAssertionHash": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "activatedAt": { "type": ["string", "null"], "format": "date-time" },
+    "activatedBy": { "type": ["string", "null"] },
+    "replacesEnvelopeId": { "type": ["string", "null"] },
+    "revokedAt": { "type": ["string", "null"], "format": "date-time" },
+    "revokedBy": { "type": ["string", "null"] },
+    "revocationReason": { "type": ["string", "null"] },
+    "expiredAt": { "type": ["string", "null"], "format": "date-time" },
     "notes": { "type": "string" }
   },
   "additionalProperties": false

@@ -20,6 +20,7 @@ export function approvalBoundEnvelope(envelope) {
     envelopeId: envelope.envelopeId,
     tenantId: envelope.tenantId,
     actionFamily: envelope.actionFamily,
+    delegateSubjectId: envelope.delegateSubjectId ?? null,
     autonomyLevel: envelope.autonomyLevel,
     status: envelope.status,
     validFrom: envelope.validFrom,
@@ -31,7 +32,12 @@ export function approvalBoundEnvelope(envelope) {
     requiresApproval: envelope.requiresApproval === true,
     approvalId: envelope.approvalId ?? null,
     approvedActionHash: envelope.approvedActionHash ?? null,
-    policyVersion: envelope.policyVersion ?? null
+    policyVersion: envelope.policyVersion ?? null,
+    authorityAssertionId: envelope.authorityAssertionId ?? null,
+    authorityAssertionHash: envelope.authorityAssertionHash ?? null,
+    activatedAt: envelope.activatedAt ?? null,
+    activatedBy: envelope.activatedBy ?? null,
+    replacesEnvelopeId: envelope.replacesEnvelopeId ?? null
   };
 }
 
