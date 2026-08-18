@@ -46,6 +46,19 @@ export {
   assertPolicyReceiptMatches,
   policyReceiptToGrowthEvent
 } from './core/policy-receipts.mjs';
+export {
+  validateAutonomyDelegation,
+  autonomyDelegationHash,
+  createDraftEnvelope,
+  evaluateEnvelopeActivation,
+  activateEnvelope,
+  assertActiveEnvelopeImmutable,
+  createReplacementDraft,
+  activateReplacement,
+  revokeEnvelope,
+  expireEnvelope,
+  envelopeLifecycleReceipt
+} from './core/envelope-lifecycle.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
 export { approvalBoundReactivationPlan, reactivationPlanApprovalHash, buildReactivationPlan, assertApprovedReactivationPlan, buildWiserrReactivationExecutionRequest } from './reactivation/plan.mjs';
