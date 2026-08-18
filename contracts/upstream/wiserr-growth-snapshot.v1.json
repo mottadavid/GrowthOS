@@ -6,16 +6,14 @@
   "contractName": "wiserr-growth-snapshot",
   "contractVersion": "1",
   "status": "CANDIDATE",
-  "validatedCommitSha": "34325851a510a7595520e68424e9f6a4ef710066",
-  "authorityFingerprint": "567aee8374298ed4b8fa6d14aa2a71bb26337c2d74dfce7f11ab4e2510811bd2",
-  "validatedAt": "2026-08-18T19:47:00.000Z",
+  "validatedCommitSha": "4770d68fcfa36130719afdbf86ec9088eee5a982",
+  "authorityFingerprint": "5682a8ce6223466f7f391929d5957515fef34c918cacc52a202041324f2c1588",
+  "validatedAt": "2026-08-18T22:38:00.000Z",
   "validUntil": null,
   "guardedPaths": [
     "server/growth/growthSnapshotService.ts",
     "tests/growth/growthSnapshotService.test.ts",
-    "docs/growth/GROWTHOS_WISERR_AUTHORITY_CONTRACT.md",
-    "server/routes/tenantInfoRoutes.ts",
-    "server/index.ts"
+    "docs/growth/GROWTHOS_READ_CONTRACT.md"
   ],
   "capabilities": {
     "aggregateGrowthSnapshotProducer": true,
@@ -29,8 +27,8 @@
   "evidence": [
     {
       "kind": "GITHUB_PR",
-      "reference": "mottadavid/Wiserr-OS#1687",
-      "summary": "Draft producer/domain slice for aggregate GrowthOS planning state; not mounted as a certified read API."
+      "reference": "mottadavid/Wiserr-OS#1701",
+      "summary": "Fresh current-base draft producer/domain slice for aggregate GrowthOS planning state; not mounted as a certified read API."
     },
     {
       "kind": "AUTHORITY_AUDIT",
@@ -43,5 +41,5 @@
       "summary": "Wiserr remains the sole blessed outbound SMS authority; existing purposes do not certify GrowthOS marketing reactivation."
     }
   ],
-  "notes": "Candidate only. GrowthOS must not require readGrowthSnapshot or any execution capability from this receipt until the upstream contract is merged, mounted behind certified auth, re-fingerprinted, and promoted to CERTIFIED. Operational capacity remains UNKNOWN until a vertical-specific or universal capacity authority is proven."
+  "notes": "Candidate only. The current upstream slice defines the aggregate producer but has no mounted GrowthOS read surface. GrowthOS must not require readGrowthSnapshot or any execution capability from this receipt until the producer is merged, an authenticated read boundary is separately merged/tested, the mounted semantic basis is re-fingerprinted, and the dependency is promoted to CERTIFIED. Operational capacity remains external to this producer and must come from a separately authorized capacity source."
 }
