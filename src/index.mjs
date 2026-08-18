@@ -128,6 +128,17 @@ export {
   failDurableReactivationCampaign,
   completeDurableReactivationCampaign
 } from './runtime/reactivation-campaign-repository.mjs';
+export {
+  ACTION_ENVELOPE_RECORD_TYPE,
+  actionEnvelopeRecoveryIndex,
+  loadDurableActionEnvelope,
+  listDurableActionEnvelopes,
+  createDurableDraftEnvelope,
+  activateDurableActionEnvelope,
+  revokeDurableActionEnvelope,
+  expireDurableActionEnvelope,
+  replaceDurableActionEnvelope
+} from './runtime/action-envelope-repository.mjs';
 export { resolveGrowthOsDatabaseConfig } from './runtime/config.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
