@@ -22,6 +22,14 @@ function uniqueStrings(value, label, { allowEmpty = false } = {}) {
   return normalized;
 }
 
+function validateCeiling(value, label, { integer = false } = {}) {
+  if (value === 'UNBOUNDED') return value;
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || (integer && !Number.isInteger(value))) {
+    throw new Error(`${label} must be ${integer ? 'a non-negative integer' : 'a non-negative finite number'} or UNBOUNDED.`);
+  }
+  return value;
+}
+
 function ceilingAllows(ceiling, requested) {
   if (ceiling === 'UNBOUNDED') return true;
   if (requested === null || requested === undefined) return false;
@@ -29,8 +37,12 @@ function ceilingAllows(ceiling, requested) {
 }
 
 function scopeAllows(allowed, requested) {
-  if (!Array.isArray(requested) || requested.length === 0) return true;
+  if (!Array.isArray(requested) || requested.length === 0) return false;
   return requested.every((item) => allowed.includes(item));
+}
+
+function assertionIsCurrent(assertion, nowMs) {
+  return assertion.status === 'ACTIVE' && nowMs >= Date.parse(assertion.validFrom) && nowMs <= Date.parse(assertion.validUntil);
 }
 
 export function validateAutonomyDelegation(assertion) {
@@ -54,6 +66,10 @@ export function validateAutonomyDelegation(assertion) {
   uniqueStrings(assertion.scopes.accountIds, 'assertion.scopes.accountIds');
   uniqueStrings(assertion.scopes.geographies, 'assertion.scopes.geographies');
   if (!assertion.limitCeilings || typeof assertion.limitCeilings !== 'object') throw new Error('assertion.limitCeilings is required.');
+  validateCeiling(assertion.limitCeilings.maxSpendUsdPerDay, 'assertion.limitCeilings.maxSpendUsdPerDay');
+  validateCeiling(assertion.limitCeilings.maxSpendUsdTotal, 'assertion.limitCeilings.maxSpendUsdTotal');
+  validateCeiling(assertion.limitCeilings.maxChangePercent, 'assertion.limitCeilings.maxChangePercent');
+  validateCeiling(assertion.limitCeilings.maxRecipients, 'assertion.limitCeilings.maxRecipients', { integer: true });
   if (!Number.isInteger(assertion.limitCeilings.maxAttempts) || assertion.limitCeilings.maxAttempts < 1) throw new Error('assertion.limitCeilings.maxAttempts must be positive.');
   if (typeof assertion.canActivateEnvelopes !== 'boolean' || typeof assertion.canRevokeEnvelopes !== 'boolean') throw new Error('assertion activation/revocation permissions must be boolean.');
   return assertion;
@@ -93,9 +109,9 @@ export function createDraftEnvelope(input) {
     status: 'DRAFT',
     validFrom: iso(input.validFrom, 'validFrom'),
     validUntil: iso(input.validUntil, 'validUntil'),
-    channels: uniqueStrings(input.channels ?? [], 'channels', { allowEmpty: true }),
-    accountIds: uniqueStrings(input.accountIds ?? [], 'accountIds', { allowEmpty: true }),
-    geographies: uniqueStrings(input.geographies ?? [], 'geographies', { allowEmpty: true }),
+    channels: uniqueStrings(input.channels, 'channels'),
+    accountIds: uniqueStrings(input.accountIds, 'accountIds'),
+    geographies: uniqueStrings(input.geographies, 'geographies'),
     limits: structuredClone(input.limits),
     requiresApproval: input.requiresApproval === true,
     approvalId: input.approvalId ?? null,
@@ -121,11 +137,11 @@ export function evaluateEnvelopeActivation({ envelope, assertion, actorId, now =
 
   if (envelope.status !== 'DRAFT') reasons.push('ENVELOPE_NOT_DRAFT');
   if (assertion.status !== 'ACTIVE') reasons.push(`DELEGATION_${assertion.status}`);
-  if (nowMs < Date.parse(assertion.validFrom) || nowMs > Date.parse(assertion.validUntil)) reasons.push('DELEGATION_NOT_CURRENT');
+  if (!assertionIsCurrent(assertion, nowMs)) reasons.push('DELEGATION_NOT_CURRENT');
   if (!assertion.canActivateEnvelopes) reasons.push('DELEGATION_CANNOT_ACTIVATE');
   if (actorId !== assertion.grantingActorId) reasons.push('GRANTING_ACTOR_MISMATCH');
   if (envelope.tenantId !== assertion.tenantId) reasons.push('TENANT_MISMATCH');
-  if (!assertion.allowedDelegateSubjectIds.includes(envelope.delegateSubjectId)) reasons.push('DELEGATE_SUBJECT_NOT_AUTHORIZED');
+  if (!envelope.delegateSubjectId || !assertion.allowedDelegateSubjectIds.includes(envelope.delegateSubjectId)) reasons.push('DELEGATE_SUBJECT_NOT_AUTHORIZED');
   if (!assertion.actionFamilies.includes(envelope.actionFamily)) reasons.push('ACTION_FAMILY_NOT_DELEGATED');
   if (!assertion.allowedAutonomyLevels.includes(envelope.autonomyLevel)) reasons.push('AUTONOMY_LEVEL_NOT_DELEGATED');
   if (!scopeAllows(assertion.scopes.channels, envelope.channels)) reasons.push('CHANNEL_SCOPE_EXCEEDED');
@@ -175,7 +191,11 @@ export function createReplacementDraft(activeEnvelope, { envelopeId, changes = {
     authorityAssertionHash: null,
     activatedAt: null,
     activatedBy: null,
-    replacesEnvelopeId: activeEnvelope.envelopeId
+    replacesEnvelopeId: activeEnvelope.envelopeId,
+    revokedAt: null,
+    revokedBy: null,
+    revocationReason: null,
+    expiredAt: null
   };
   validateActionEnvelope(candidate);
   return candidate;
@@ -192,10 +212,14 @@ export function revokeEnvelope({ envelope, assertion, actorId, now = new Date(),
   validateActionEnvelope(envelope);
   validateAutonomyDelegation(assertion);
   requiredString(reason, 'reason');
+  const nowIso = iso(now, 'now');
+  const nowMs = Date.parse(nowIso);
   if (ENVELOPE_TERMINAL.has(envelope.status)) throw new Error('ENVELOPE_ALREADY_TERMINAL');
-  if (assertion.status !== 'ACTIVE' || !assertion.canRevokeEnvelopes) throw new Error('DELEGATION_CANNOT_REVOKE');
+  if (!assertionIsCurrent(assertion, nowMs) || !assertion.canRevokeEnvelopes) throw new Error('DELEGATION_CANNOT_REVOKE');
   if (assertion.tenantId !== envelope.tenantId || actorId !== assertion.grantingActorId) throw new Error('REVOCATION_AUTHORITY_MISMATCH');
-  return { ...structuredClone(envelope), status: 'REVOKED', revokedAt: iso(now, 'now'), revokedBy: actorId, revocationReason: reason };
+  if (!envelope.delegateSubjectId || !assertion.allowedDelegateSubjectIds.includes(envelope.delegateSubjectId)) throw new Error('REVOCATION_DELEGATE_SCOPE_MISMATCH');
+  if (!assertion.actionFamilies.includes(envelope.actionFamily)) throw new Error('REVOCATION_ACTION_FAMILY_MISMATCH');
+  return { ...structuredClone(envelope), status: 'REVOKED', revokedAt: nowIso, revokedBy: actorId, revocationReason: reason };
 }
 
 export function expireEnvelope(envelope, now = new Date()) {
