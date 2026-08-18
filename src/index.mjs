@@ -37,6 +37,15 @@ export {
   deriveCapacityState,
   capacityForBusinessState
 } from './core/capacity-evidence.mjs';
+export {
+  approvalBoundEnvelope,
+  envelopeAuthorityHash,
+  policyReceiptHash,
+  validatePolicyDecisionReceipt,
+  createPolicyDecisionReceipt,
+  assertPolicyReceiptMatches,
+  policyReceiptToGrowthEvent
+} from './core/policy-receipts.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
 export { approvalBoundReactivationPlan, reactivationPlanApprovalHash, buildReactivationPlan, assertApprovedReactivationPlan, buildWiserrReactivationExecutionRequest } from './reactivation/plan.mjs';
