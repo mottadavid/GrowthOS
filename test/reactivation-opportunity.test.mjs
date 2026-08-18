@@ -33,6 +33,12 @@ test('does not manufacture an opportunity from stale state', () => {
   assert.ok(result.reasons.includes('BUSINESS_STATE_NOT_FRESH_ENOUGH'));
 });
 
+test('does not manufacture an opportunity when business capacity is unknown', () => {
+  const result = evaluateDormantLeadReactivation(snapshot({ capacity: { status: 'UNKNOWN', demandThrottleRecommended: false } }));
+  assert.equal(result.decision, REACTIVATION_DECISIONS.INSUFFICIENT_EVIDENCE);
+  assert.ok(result.reasons.includes('BUSINESS_CAPACITY_UNAVAILABLE'));
+});
+
 test('chooses NO_ACTION when capacity is full or demand throttle is recommended', () => {
   const full = evaluateDormantLeadReactivation(snapshot({ capacity: { status: 'FULL', demandThrottleRecommended: false } }));
   assert.equal(full.decision, REACTIVATION_DECISIONS.NO_ACTION);

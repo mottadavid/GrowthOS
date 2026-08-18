@@ -31,6 +31,14 @@ export function evaluateDormantLeadReactivation(businessState, {
     };
   }
 
+  const capacityStatus = businessState.capacity?.status;
+  if (!capacityStatus || capacityStatus === 'UNKNOWN') {
+    return {
+      decision: REACTIVATION_DECISIONS.INSUFFICIENT_EVIDENCE,
+      reasons: ['BUSINESS_CAPACITY_UNAVAILABLE']
+    };
+  }
+
   const dormantLeads = businessState.cohorts?.dormantLeads;
   if (!Number.isInteger(dormantLeads) || dormantLeads < 0) {
     return {
@@ -39,7 +47,7 @@ export function evaluateDormantLeadReactivation(businessState, {
     };
   }
 
-  if (businessState.capacity?.status === 'FULL' || businessState.capacity?.demandThrottleRecommended === true) {
+  if (capacityStatus === 'FULL' || businessState.capacity?.demandThrottleRecommended === true) {
     return {
       decision: REACTIVATION_DECISIONS.NO_ACTION,
       reasons: ['BUSINESS_CAPACITY_DOES_NOT_JUSTIFY_MORE_DEMAND']
@@ -54,7 +62,7 @@ export function evaluateDormantLeadReactivation(businessState, {
     };
   }
 
-  const constrained = businessState.capacity?.status === 'CONSTRAINED';
+  const constrained = capacityStatus === 'CONSTRAINED';
   const detectedAt = now instanceof Date ? now.toISOString() : new Date(now).toISOString();
 
   return {
