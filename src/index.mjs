@@ -87,6 +87,11 @@ export {
   validateGrowthSnapshotFreshness,
   readWiserrGrowthSnapshot
 } from './integrations/wiserr/read-client.mjs';
+export {
+  validateWiserrGrowthSnapshotAuthorityBasis,
+  wiserrGrowthSnapshotAuthorityFingerprint,
+  currentWiserrGrowthSnapshotProducerBasis
+} from './integrations/wiserr/growth-snapshot-authority.mjs';
 export { approvalBoundReactivationPlan, reactivationPlanApprovalHash, buildReactivationPlan, assertApprovedReactivationPlan, buildWiserrReactivationExecutionRequest } from './reactivation/plan.mjs';
 export { buildReactivationPolicyAction } from './reactivation/action.mjs';
 export {
