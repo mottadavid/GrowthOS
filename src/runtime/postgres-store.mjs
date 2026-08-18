@@ -12,6 +12,11 @@ function validDate(value, label) {
   return date.toISOString();
 }
 
+function validateLimit(limit) {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 10000) throw new Error('limit must be an integer between 1 and 10000.');
+  return limit;
+}
+
 function runtimeError(code, message = code) {
   const error = new Error(message);
   error.code = code;
@@ -68,6 +73,21 @@ export class PostgresRuntimeStore {
       [tenantId, recordType, recordId]
     );
     return rowToRecord(result.rows?.[0] ?? null);
+  }
+
+  async listRecords({ tenantId, recordType, limit = 1000 }) {
+    requiredString(tenantId, 'tenantId');
+    requiredString(recordType, 'recordType');
+    validateLimit(limit);
+    const result = await this.query(
+      `SELECT tenant_id, record_type, record_id, revision, payload, payload_hash, created_at, updated_at
+         FROM growthos_records
+        WHERE tenant_id = $1 AND record_type = $2
+        ORDER BY updated_at DESC, record_id ASC
+        LIMIT $3`,
+      [tenantId, recordType, limit]
+    );
+    return (result.rows || []).map(rowToRecord);
   }
 
   async putRecord({ tenantId, recordType, recordId, payload, expectedRevision, now = new Date() }) {
@@ -164,7 +184,7 @@ export class PostgresRuntimeStore {
   async listEvents({ tenantId, correlationId = null, limit = 1000 }) {
     requiredString(tenantId, 'tenantId');
     if (correlationId !== null) requiredString(correlationId, 'correlationId');
-    if (!Number.isInteger(limit) || limit < 1 || limit > 10000) throw new Error('limit must be an integer between 1 and 10000.');
+    validateLimit(limit);
 
     const result = await this.query(
       `SELECT event_id, tenant_id, event_type, occurred_at, recorded_at, correlation_id, causation_id, payload, payload_hash
