@@ -165,6 +165,12 @@ export {
   listDurableBusinessOutcomes,
   ingestDurableBusinessOutcome
 } from './runtime/business-outcome-repository.mjs';
+export {
+  WISERR_GROWTH_SNAPSHOT_RECORD_TYPE,
+  loadDurableWiserrGrowthSnapshot,
+  listDurableWiserrGrowthSnapshots,
+  readAndPersistWiserrGrowthSnapshot
+} from './runtime/wiserr-snapshot-repository.mjs';
 export { resolveGrowthOsDatabaseConfig } from './runtime/config.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
