@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growthos.local/schemas/action-envelope.schema.json",
+  "title": "GrowthOS Action Envelope",
+  "type": "object",
+  "required": ["schemaVersion", "envelopeId", "tenantId", "actionFamily", "autonomyLevel", "status", "validFrom", "validUntil", "limits"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "envelopeId": { "type": "string", "minLength": 1 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "actionFamily": { "type": "string", "minLength": 1 },
+    "autonomyLevel": { "enum": ["L0_OBSERVE", "L1_RECOMMEND", "L2_DRAFT", "L3_APPROVAL_REQUIRED", "L4_BOUNDED_AUTONOMOUS", "L5_LOW_RISK_AUTONOMOUS"] },
+    "status": { "enum": ["DRAFT", "ACTIVE", "REVOKED", "EXPIRED"] },
+    "validFrom": { "type": "string", "format": "date-time" },
+    "validUntil": { "type": "string", "format": "date-time" },
+    "channels": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "accountIds": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "geographies": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "maxSpendUsdPerDay": { "type": ["number", "null"], "minimum": 0 },
+        "maxSpendUsdTotal": { "type": ["number", "null"], "minimum": 0 },
+        "maxChangePercent": { "type": ["number", "null"], "minimum": 0 },
+        "maxAttempts": { "type": "integer", "minimum": 1 },
+        "maxRecipients": { "type": ["integer", "null"], "minimum": 0 }
+      },
+      "required": ["maxAttempts"],
+      "additionalProperties": false
+    },
+    "requiresApproval": { "type": "boolean" },
+    "approvalId": { "type": ["string", "null"] },
+    "policyVersion": { "type": "string" },
+    "notes": { "type": "string" }
+  },
+  "additionalProperties": false
+}
