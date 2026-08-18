@@ -40,3 +40,18 @@ export {
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
 export { approvalBoundReactivationPlan, reactivationPlanApprovalHash, buildReactivationPlan, assertApprovedReactivationPlan, buildWiserrReactivationExecutionRequest } from './reactivation/plan.mjs';
+export {
+  REACTIVATION_CAMPAIGN_STATES,
+  CAMPAIGN_START_DECISIONS,
+  createReactivationCampaign,
+  submitReactivationCampaignForApproval,
+  approveReactivationCampaign,
+  assertCampaignPlanIntegrity,
+  evaluateReactivationCampaignStart,
+  startReactivationCampaign,
+  markReactivationCampaignObserving,
+  markReactivationCampaignReconciliationRequired,
+  stopReactivationCampaign,
+  failReactivationCampaign,
+  completeReactivationCampaign
+} from './reactivation/campaign.mjs';
