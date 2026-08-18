@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growthos.local/schemas/action-request.schema.json",
+  "title": "GrowthOS Action Request",
+  "type": "object",
+  "required": ["schemaVersion", "actionId", "tenantId", "actionFamily", "actionType", "requestedAt", "requestedBy", "inputs", "expectedCost", "attemptNumber"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "actionId": { "type": "string", "minLength": 1 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "actionFamily": { "type": "string", "minLength": 1 },
+    "actionType": { "type": "string", "minLength": 1 },
+    "channel": { "type": ["string", "null"] },
+    "accountId": { "type": ["string", "null"] },
+    "geography": { "type": ["string", "null"] },
+    "requestedAt": { "type": "string", "format": "date-time" },
+    "requestedBy": { "type": "string", "minLength": 1 },
+    "businessSnapshotId": { "type": ["string", "null"] },
+    "opportunityId": { "type": ["string", "null"] },
+    "experimentId": { "type": ["string", "null"] },
+    "inputs": { "type": "object" },
+    "expectedCost": {
+      "type": "object",
+      "required": ["spendUsd", "recipients"],
+      "properties": {
+        "spendUsd": { "type": ["number", "null"], "minimum": 0 },
+        "recipients": { "type": ["integer", "null"], "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "currentTotalSpendUsd": { "type": ["number", "null"], "minimum": 0 },
+    "currentDailySpendUsd": { "type": ["number", "null"], "minimum": 0 },
+    "changePercent": { "type": ["number", "null"], "minimum": 0 },
+    "attemptNumber": { "type": "integer", "minimum": 1 },
+    "approvalId": { "type": ["string", "null"] }
+  },
+  "additionalProperties": false
+}

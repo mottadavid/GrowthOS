@@ -1,0 +1,15 @@
+{
+  "name": "growthos",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Governed autonomous growth operating system for service businesses.",
+  "scripts": {
+    "test": "node --test",
+    "verify:syntax": "node --check src/core/canonical.mjs && node --check src/core/control-plane.mjs && node --check src/core/validators.mjs && node --check src/opportunities/reactivation.mjs && node --check src/index.mjs",
+    "verify": "npm run verify:syntax && npm test"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
