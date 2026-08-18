@@ -53,6 +53,9 @@ export function validateActionEnvelope(envelope) {
   if (limits.maxRecipients !== undefined && limits.maxRecipients !== null && (!Number.isInteger(limits.maxRecipients) || limits.maxRecipients < 0)) {
     throw new Error('envelope.limits.maxRecipients must be a non-negative integer or null.');
   }
+  if (envelope.approvedActionHash !== undefined && envelope.approvedActionHash !== null && !/^[a-f0-9]{64}$/.test(envelope.approvedActionHash)) {
+    throw new Error('envelope.approvedActionHash must be a SHA-256 hex string or null.');
+  }
   return envelope;
 }
 
