@@ -95,6 +95,11 @@ export {
   InMemoryRuntimeStore
 } from './runtime/store.mjs';
 export { PostgresRuntimeStore } from './runtime/postgres-store.mjs';
+export {
+  AtomicInMemoryRuntimeStore,
+  AtomicPostgresRuntimeStore,
+  mutateAuthoritativeRuntimeState
+} from './runtime/atomic-store.mjs';
 export { resolveGrowthOsDatabaseConfig } from './runtime/config.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
