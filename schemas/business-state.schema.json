@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://growthos.local/schemas/business-state.schema.json",
+  "title": "GrowthOS Business State Snapshot",
+  "type": "object",
+  "required": ["schemaVersion", "snapshotId", "tenantId", "sourceSystem", "asOf", "completeness", "business", "capacity", "funnel", "cohorts"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "snapshotId": { "type": "string", "minLength": 1 },
+    "tenantId": { "type": "string", "minLength": 1 },
+    "sourceSystem": { "type": "string", "minLength": 1 },
+    "sourceVersion": { "type": ["string", "null"] },
+    "asOf": { "type": "string", "format": "date-time" },
+    "completeness": { "enum": ["COMPLETE_FOR_PURPOSE", "PARTIAL", "STALE", "UNAVAILABLE"] },
+    "business": {
+      "type": "object",
+      "required": ["vertical", "timezone", "locations", "services"],
+      "properties": {
+        "vertical": { "type": ["string", "null"] },
+        "timezone": { "type": "string", "minLength": 1 },
+        "locations": { "type": "array", "items": { "type": "string" } },
+        "services": { "type": "array", "items": { "type": "string" } },
+        "goals": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "capacity": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["AVAILABLE", "CONSTRAINED", "FULL", "UNKNOWN"] },
+        "signals": { "type": "array", "items": { "type": "string" } },
+        "demandThrottleRecommended": { "type": "boolean" }
+      },
+      "additionalProperties": true
+    },
+    "funnel": {
+      "type": "object",
+      "properties": {
+        "inquiries": { "type": ["integer", "null"], "minimum": 0 },
+        "qualifiedLeads": { "type": ["integer", "null"], "minimum": 0 },
+        "bookings": { "type": ["integer", "null"], "minimum": 0 },
+        "wins": { "type": ["integer", "null"], "minimum": 0 },
+        "revenueUsd": { "type": ["number", "null"], "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "cohorts": {
+      "type": "object",
+      "properties": {
+        "dormantLeads": { "type": ["integer", "null"], "minimum": 0 },
+        "inactiveCustomers": { "type": ["integer", "null"], "minimum": 0 },
+        "unacceptedEstimates": { "type": ["integer", "null"], "minimum": 0 },
+        "reviewEligibleCustomers": { "type": ["integer", "null"], "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "marketing": { "type": "object", "additionalProperties": true },
+    "warnings": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}
