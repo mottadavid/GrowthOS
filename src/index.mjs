@@ -180,6 +180,13 @@ export {
   evaluateAndPersistCapacityBundle,
   assertCapacityBundleUsableForDemand
 } from './runtime/capacity-bundle-repository.mjs';
+export {
+  REACTIVATION_OPPORTUNITY_RECORD_TYPE,
+  durableReactivationOpportunityEvaluationId,
+  loadDurableReactivationOpportunityEvaluation,
+  listDurableReactivationOpportunityEvaluations,
+  evaluateAndPersistDurableReactivationOpportunity
+} from './runtime/reactivation-opportunity-repository.mjs';
 export { resolveGrowthOsDatabaseConfig } from './runtime/config.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
