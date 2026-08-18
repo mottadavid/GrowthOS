@@ -142,7 +142,7 @@ test('durable approval requires an external authority reference and retains it',
   const created = await createDurableReactivationCampaign({ store, plan: p, now: T0 });
   const ready = await submitDurableReactivationCampaignForApproval({ store, tenantId: 'tenant-1', campaignId: created.record.recordId, now: T0 });
 
-  await assert.rejects(
+  assert.throws(
     () => approveDurableReactivationCampaign({
       store, tenantId: 'tenant-1', campaignId: ready.recordId,
       approvalId: 'approval-1', approvedBy: 'owner-1', approvedPlanHash: p.approvalHash,
