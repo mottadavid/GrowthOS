@@ -12,6 +12,7 @@ import {
 import { mutateAuthoritativeRuntimeState } from './atomic-store.mjs';
 
 export const EXECUTION_ATTEMPT_RECORD_TYPE = 'execution_attempt';
+const MAX_DURABLE_ATTEMPT_HISTORY = 10000;
 
 function requiredString(value, label) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a non-empty string.`);
@@ -32,6 +33,19 @@ function validateAttemptPayload(attempt) {
   requiredString(attempt.idempotencyKey, 'attempt.idempotencyKey');
   if (!Object.values(EXECUTION_ATTEMPT_STATES).includes(attempt.state)) throw new Error('Invalid attempt.state.');
   return attempt;
+}
+
+function validateAttemptRecord(record, tenantId) {
+  validateAttemptPayload(record.payload);
+  if (
+    record.tenantId !== tenantId ||
+    record.payload.tenantId !== tenantId ||
+    record.recordId !== record.payload.attemptId ||
+    record.indexKey !== record.payload.actionId
+  ) {
+    throw new Error('DURABLE_EXECUTION_ATTEMPT_IDENTITY_MISMATCH');
+  }
+  return record;
 }
 
 function eventIdFor(attempt, revision) {
@@ -59,32 +73,34 @@ export async function loadDurableExecutionAttempt({ store, tenantId, attemptId }
   requiredString(attemptId, 'attemptId');
   const record = await store.getRecord({ tenantId, recordType: EXECUTION_ATTEMPT_RECORD_TYPE, recordId: attemptId });
   if (!record) return null;
-  validateAttemptPayload(record.payload);
-  if (record.payload.tenantId !== tenantId || record.payload.attemptId !== attemptId) {
-    throw new Error('DURABLE_EXECUTION_ATTEMPT_IDENTITY_MISMATCH');
-  }
-  return record;
+  return validateAttemptRecord(record, tenantId);
 }
 
 export async function listDurableExecutionAttempts({ store, tenantId, actionId = null, limit = 1000 }) {
   requiredString(tenantId, 'tenantId');
   if (actionId !== null) requiredString(actionId, 'actionId');
-  const records = await store.listRecords({ tenantId, recordType: EXECUTION_ATTEMPT_RECORD_TYPE, limit });
-  const validated = records.map(record => {
-    validateAttemptPayload(record.payload);
-    if (record.payload.tenantId !== tenantId || record.recordId !== record.payload.attemptId) {
-      throw new Error('DURABLE_EXECUTION_ATTEMPT_IDENTITY_MISMATCH');
-    }
-    return record;
+  const records = await store.listRecords({
+    tenantId,
+    recordType: EXECUTION_ATTEMPT_RECORD_TYPE,
+    indexKey: actionId,
+    limit
   });
-  return actionId === null ? validated : validated.filter(record => record.payload.actionId === actionId);
+  return records.map(record => validateAttemptRecord(record, tenantId));
 }
 
 export async function createDurableExecutionAttempt({ store, action, maxAttempts = 1, now = new Date() }) {
   if (!action || typeof action !== 'object') throw new Error('action is required.');
   requiredString(action.tenantId, 'action.tenantId');
   requiredString(action.actionId, 'action.actionId');
-  const existingRecords = await listDurableExecutionAttempts({ store, tenantId: action.tenantId, actionId: action.actionId });
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > MAX_DURABLE_ATTEMPT_HISTORY) {
+    throw new Error(`maxAttempts must be an integer between 1 and ${MAX_DURABLE_ATTEMPT_HISTORY}.`);
+  }
+  const existingRecords = await listDurableExecutionAttempts({
+    store,
+    tenantId: action.tenantId,
+    actionId: action.actionId,
+    limit: MAX_DURABLE_ATTEMPT_HISTORY
+  });
   const existingAttempts = existingRecords.map(record => clone(record.payload));
   const attempt = createExecutionAttempt({ action, attempts: existingAttempts, maxAttempts, now });
   validateAttemptPayload(attempt);
@@ -94,6 +110,7 @@ export async function createDurableExecutionAttempt({ store, action, maxAttempts
     tenantId: attempt.tenantId,
     recordType: EXECUTION_ATTEMPT_RECORD_TYPE,
     recordId: attempt.attemptId,
+    indexKey: attempt.actionId,
     payload: attempt,
     expectedRevision: 0,
     now,
@@ -104,7 +121,7 @@ export async function createDurableExecutionAttempt({ store, action, maxAttempts
       correlationId: attempt.actionId
     }
   });
-  return result.record;
+  return validateAttemptRecord(result.record, attempt.tenantId);
 }
 
 async function transition({ store, tenantId, attemptId, now = new Date(), apply }) {
@@ -122,6 +139,7 @@ async function transition({ store, tenantId, attemptId, now = new Date(), apply 
     tenantId,
     recordType: EXECUTION_ATTEMPT_RECORD_TYPE,
     recordId: attemptId,
+    indexKey: nextAttempt.actionId,
     payload: nextAttempt,
     expectedRevision: current.revision,
     now,
@@ -132,7 +150,7 @@ async function transition({ store, tenantId, attemptId, now = new Date(), apply 
       correlationId: nextAttempt.actionId
     }
   });
-  return result.record;
+  return validateAttemptRecord(result.record, tenantId);
 }
 
 export function markDurableExecutionSubmitting({ store, tenantId, attemptId, now = new Date() }) {
