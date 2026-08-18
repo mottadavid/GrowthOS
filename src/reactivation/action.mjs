@@ -1,3 +1,4 @@
+import { sha256Canonical } from '../core/canonical.mjs';
 import { reactivationPlanApprovalHash } from './plan.mjs';
 
 function requiredString(value, label) {
@@ -55,7 +56,7 @@ export function buildReactivationPolicyAction({
       cohortDefinitionId: requiredString(plan.cohort?.definitionId, 'plan.cohort.definitionId'),
       cohortDefinitionVersion: requiredString(plan.cohort?.definitionVersion, 'plan.cohort.definitionVersion'),
       messageVersion: requiredString(plan.message?.version, 'plan.message.version'),
-      messageHash: requiredString(planHash, 'planHash'),
+      messageHash: sha256Canonical(plan.message),
       increasesTotalBudget: false,
       changesPublicPrice: false,
       createsGuarantee: false,
