@@ -15,6 +15,15 @@ export {
   reconcileExecutionAttempt,
   classifyUnexpectedExecutionError
 } from './core/execution-attempts.mjs';
+export {
+  validateGrowthEvent,
+  createGrowthEvent,
+  appendGrowthEvent,
+  buildGrowthTrace,
+  validateOutcomeAttribution,
+  createOutcomeEvent,
+  summarizeOutcomeTrace
+} from './core/growth-events.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
 export { approvalBoundReactivationPlan, reactivationPlanApprovalHash, buildReactivationPlan, assertApprovedReactivationPlan, buildWiserrReactivationExecutionRequest } from './reactivation/plan.mjs';
