@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { evaluateDormantLeadReactivation } from '../src/opportunities/reactivation.mjs';
-import { chooseReactivationChannel, toGrowthBusinessState } from '../src/integrations/wiserr/growth-snapshot.mjs';
+import { chooseReactivationChannel, channelEligibility, toGrowthBusinessState } from '../src/integrations/wiserr/growth-snapshot.mjs';
 import {
   assertApprovedReactivationPlan,
   buildReactivationPlan,
@@ -37,14 +37,7 @@ function snapshot(overrides = {}) {
     ...base,
     ...overrides,
     capacity: { ...base.capacity, ...(overrides.capacity || {}) },
-    reactivation: {
-      ...base.reactivation,
-      ...(overrides.reactivation || {}),
-      eligibleByChannel: {
-        ...base.reactivation.eligibleByChannel,
-        ...(overrides.reactivation?.eligibleByChannel || {})
-      }
-    },
+    reactivation: { ...base.reactivation, ...(overrides.reactivation || {}), eligibleByChannel: { ...base.reactivation.eligibleByChannel, ...(overrides.reactivation?.eligibleByChannel || {}) } },
     capabilities: { ...base.capabilities, ...(overrides.capabilities || {}) }
   };
 }
@@ -63,14 +56,32 @@ test('adapts bounded Wiserr snapshot into GrowthOS business state', () => {
   assert.equal(state.capacity.status, 'AVAILABLE');
 });
 
-test('chooses only channels with both certified capability and eligible recipients', () => {
+test('legacy capability-aware channel chooser still requires capability plus eligibility', () => {
   const result = chooseReactivationChannel(snapshot(), ['whatsapp', 'sms', 'email']);
   assert.equal(result.selected.channel, 'sms');
   assert.equal(result.evaluated[0].ready, false);
 });
 
-test('fails closed when requested channel capability is not certified', () => {
+test('planning can use channel eligibility even when snapshot does not certify send capability', () => {
   const snap = snapshot({ capabilities: { reactivationSms: false } });
+  const eligibility = channelEligibility(snap, 'sms');
+  assert.equal(eligibility.eligibleRecipients, 80);
+  assert.equal(snap.capabilities.reactivationSms, false);
+  const opportunity = opportunityFrom(snap);
+  const plan = buildReactivationPlan({
+    opportunity,
+    snapshot: snap,
+    channel: 'sms',
+    requestedMaxRecipients: 50,
+    message: { strategy: 'simple-return', body: 'Still interested? Reply here.', version: '1' }
+  });
+  assert.equal(plan.channel, 'sms');
+  assert.equal(plan.cohort.plannedMaxRecipients, 50);
+  assert.equal(plan.execution.requiresCapability, 'reactivationSms');
+});
+
+test('planning still fails closed when the requested channel has zero eligible recipients', () => {
+  const snap = snapshot({ capabilities: { reactivationSms: false }, reactivation: { eligibleByChannel: { sms: 0 } } });
   const opportunity = opportunityFrom(snap);
   assert.throws(() => buildReactivationPlan({
     opportunity,
@@ -78,19 +89,13 @@ test('fails closed when requested channel capability is not certified', () => {
     channel: 'sms',
     requestedMaxRecipients: 50,
     message: { strategy: 'simple-return', body: 'Still interested? Reply here.', version: '1' }
-  }), /capability reactivationSms is not enabled/);
+  }), /No currently eligible sms recipients/);
 });
 
 test('builds a plan capped by current eligible cohort', () => {
   const snap = snapshot({ reactivation: { eligibleByChannel: { sms: 42 } } });
   const opportunity = opportunityFrom(snap);
-  const plan = buildReactivationPlan({
-    opportunity,
-    snapshot: snap,
-    channel: 'sms',
-    requestedMaxRecipients: 100,
-    message: { strategy: 'simple-return', body: 'Still interested? Reply here.', version: '1' }
-  });
+  const plan = buildReactivationPlan({ opportunity, snapshot: snap, channel: 'sms', requestedMaxRecipients: 100, message: { strategy: 'simple-return', body: 'Still interested? Reply here.', version: '1' } });
   assert.equal(plan.cohort.plannedMaxRecipients, 42);
   assert.match(plan.approvalHash, /^[0-9a-f]{64}$/);
 });
@@ -98,16 +103,9 @@ test('builds a plan capped by current eligible cohort', () => {
 test('plan approval is invalidated by message, cohort, or channel mutation', () => {
   const snap = snapshot();
   const opportunity = opportunityFrom(snap);
-  const plan = buildReactivationPlan({
-    opportunity,
-    snapshot: snap,
-    channel: 'sms',
-    requestedMaxRecipients: 50,
-    message: { strategy: 'simple-return', body: 'Still interested? Reply here.', version: '1' }
-  });
+  const plan = buildReactivationPlan({ opportunity, snapshot: snap, channel: 'sms', requestedMaxRecipients: 50, message: { strategy: 'simple-return', body: 'Still interested? Reply here.', version: '1' } });
   const approvedHash = plan.approvalHash;
   assert.equal(assertApprovedReactivationPlan(plan, approvedHash), true);
-
   const mutated = structuredClone(plan);
   mutated.message.body = 'Different unapproved message';
   assert.throws(() => assertApprovedReactivationPlan(mutated, approvedHash), /APPROVED_REACTIVATION_PLAN_CHANGED/);
@@ -117,22 +115,8 @@ test('plan approval is invalidated by message, cohort, or channel mutation', () 
 test('execution request preserves exact approval, cohort version, and stable idempotency key', () => {
   const snap = snapshot();
   const opportunity = opportunityFrom(snap);
-  const plan = buildReactivationPlan({
-    opportunity,
-    snapshot: snap,
-    channel: 'email',
-    requestedMaxRecipients: 75,
-    successMetric: 'WON_CUSTOMER',
-    message: { strategy: 'return-offer', body: 'We have an opening this week. Reply if useful.', version: '2', offerId: 'offer-7' }
-  });
-
-  const request = buildWiserrReactivationExecutionRequest({
-    plan,
-    approvalHash: plan.approvalHash,
-    actionId: 'action-123',
-    experimentId: 'experiment-9'
-  });
-
+  const plan = buildReactivationPlan({ opportunity, snapshot: snap, channel: 'email', requestedMaxRecipients: 75, successMetric: 'WON_CUSTOMER', message: { strategy: 'return-offer', body: 'We have an opening this week. Reply if useful.', version: '2', offerId: 'offer-7' } });
+  const request = buildWiserrReactivationExecutionRequest({ plan, approvalHash: plan.approvalHash, actionId: 'action-123', experimentId: 'experiment-9' });
   assert.equal(request.planApprovalHash, plan.approvalHash);
   assert.equal(request.cohortDefinitionId, 'dormant-leads-90d');
   assert.equal(request.cohortDefinitionVersion, '1');
@@ -144,11 +128,5 @@ test('snapshot mismatch blocks planning from stale opportunity evidence', () => 
   const old = snapshot();
   const opportunity = opportunityFrom(old);
   const newer = snapshot({ snapshotId: 'snap-2' });
-  assert.throws(() => buildReactivationPlan({
-    opportunity,
-    snapshot: newer,
-    channel: 'sms',
-    requestedMaxRecipients: 50,
-    message: { strategy: 'simple-return', body: 'Still interested? Reply here.', version: '1' }
-  }), /Opportunity snapshot does not match current Wiserr snapshot/);
+  assert.throws(() => buildReactivationPlan({ opportunity, snapshot: newer, channel: 'sms', requestedMaxRecipients: 50, message: { strategy: 'simple-return', body: 'Still interested? Reply here.', version: '1' } }), /Opportunity snapshot does not match current Wiserr snapshot/);
 });
