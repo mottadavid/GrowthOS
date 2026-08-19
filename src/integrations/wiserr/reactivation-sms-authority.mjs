@@ -175,3 +175,23 @@ export function evaluateWiserrReactivationSmsExecutionAuthority({
     now
   });
 }
+
+export function isWiserrReactivationSmsExecutionAuthorityReady(decision) {
+  return !!decision
+    && decision.decision === UPSTREAM_AUTHORITY_DECISIONS.READY
+    && decision.metadata?.dependencyId === WISERR_REACTIVATION_SMS_DEPENDENCY_ID;
+}
+
+export function assertWiserrReactivationSmsExecutionAuthorityReady(decision) {
+  if (!isWiserrReactivationSmsExecutionAuthorityReady(decision)) {
+    const reasons = [
+      'WISERR_REACTIVATION_SMS_EXECUTION_AUTHORITY_NOT_READY',
+      ...(Array.isArray(decision?.reasons) ? decision.reasons : [])
+    ];
+    const error = new Error(reasons.join(':'));
+    error.code = 'WISERR_REACTIVATION_SMS_EXECUTION_AUTHORITY_NOT_READY';
+    error.authorityDecision = decision ?? null;
+    throw error;
+  }
+  return true;
+}
