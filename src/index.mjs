@@ -35,6 +35,7 @@ export {
   listDurableWiserrReactivationCommands, persistDurableWiserrReactivationCommand,
   assertDurableWiserrReactivationCommandMatches
 } from './runtime/wiserr-reactivation-command-repository.mjs';
+export { preparePersistedWiserrReactivationSubmission } from './runtime/wiserr-submission-preparation.mjs';
 export {
   REACTIVATION_CAMPAIGN_RECORD_TYPE, durableCampaignIdForPlan, loadDurableReactivationCampaign,
   listDurableReactivationCampaigns, createDurableReactivationCampaign,
