@@ -47,12 +47,14 @@ export {
   ingestWiserrReactivationSubmissionResult
 } from './runtime/wiserr-submission-result-ingestion.mjs';
 export { ingestWiserrReactivationSubmissionResultAndAdvanceCampaign } from './runtime/wiserr-submission-campaign-coordinator.mjs';
+export { reconcileWiserrReactivationSubmissionAndCampaign } from './runtime/wiserr-submission-reconciliation-coordinator.mjs';
 export {
   REACTIVATION_CAMPAIGN_RECORD_TYPE, durableCampaignIdForPlan, loadDurableReactivationCampaign,
   listDurableReactivationCampaigns, createDurableReactivationCampaign,
   submitDurableReactivationCampaignForApproval, approveDurableReactivationCampaign,
   startDurableReactivationCampaignFromCommand, startDurableReactivationCampaignFromPersistedCommand,
   markDurableReactivationCampaignObserving, markDurableReactivationCampaignReconciliationRequired,
+  resolveDurableReactivationCampaignReconciliationCompleted,
   stopDurableReactivationCampaign, failDurableReactivationCampaign, completeDurableReactivationCampaign
 } from './runtime/reactivation-campaign-repository.mjs';
 export { ACTION_ENVELOPE_RECORD_TYPE, actionEnvelopeRecoveryIndex, loadDurableActionEnvelope, listDurableActionEnvelopes, createDurableDraftEnvelope, activateDurableActionEnvelope, revokeDurableActionEnvelope, expireDurableActionEnvelope, replaceDurableActionEnvelope } from './runtime/action-envelope-repository.mjs';
@@ -73,5 +75,5 @@ export { WISERR_REACTIVATION_SMS_DEPENDENCY_ID, WISERR_REACTIVATION_SMS_CONTRACT
 export { approvalBoundReactivationPlan, reactivationPlanApprovalHash, buildReactivationPlan, assertApprovedReactivationPlan, buildWiserrReactivationExecutionRequest } from './reactivation/plan.mjs';
 export { buildReactivationPolicyAction } from './reactivation/action.mjs';
 export { REACTIVATION_PREFLIGHT_DECISIONS, evaluateReactivationExecutionPrerequisites } from './reactivation/execution-preflight.mjs';
-export { REACTIVATION_CAMPAIGN_STATES, CAMPAIGN_START_DECISIONS, createReactivationCampaign, submitReactivationCampaignForApproval, approveReactivationCampaign, assertCampaignPlanIntegrity, evaluateReactivationCampaignStart, startReactivationCampaign, markReactivationCampaignObserving, markReactivationCampaignReconciliationRequired, stopReactivationCampaign, failReactivationCampaign, completeReactivationCampaign } from './reactivation/campaign.mjs';
+export { REACTIVATION_CAMPAIGN_STATES, CAMPAIGN_START_DECISIONS, createReactivationCampaign, submitReactivationCampaignForApproval, approveReactivationCampaign, assertCampaignPlanIntegrity, evaluateReactivationCampaignStart, startReactivationCampaign, markReactivationCampaignObserving, markReactivationCampaignReconciliationRequired, resolveReactivationCampaignReconciliationCompleted, stopReactivationCampaign, failReactivationCampaign, completeReactivationCampaign } from './reactivation/campaign.mjs';
 export { wiserrReactivationCommandHash, buildWiserrReactivationCommand, validateWiserrReactivationCommand } from './reactivation/wiserr-command.mjs';
