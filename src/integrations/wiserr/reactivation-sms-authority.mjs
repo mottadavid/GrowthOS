@@ -8,6 +8,15 @@ export const WISERR_REACTIVATION_SMS_DEPENDENCY_ID = 'wiserr-reactivation-sms-v1
 export const WISERR_REACTIVATION_SMS_CONTRACT_NAME = 'wiserr-reactivation-sms';
 export const WISERR_REACTIVATION_SMS_CAPABILITY = 'reactivationSmsExecution';
 
+const REQUIRED_EXECUTION_CERTIFICATION_FIELDS = Object.freeze([
+  'stableCorrelationIdentity',
+  'orchestratorIdempotencyPropagation',
+  'canonicalSubmissionResultClassification',
+  'durableResultEvidenceReference',
+  'suppressionClassificationPreserved',
+  'ambiguousOutcomeLookupContract'
+]);
+
 function requiredString(value, label) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a non-empty string.`);
   return value;
@@ -71,8 +80,8 @@ export function validateWiserrReactivationSmsAuthorityBasis(basis) {
 
   const execution = basis.execution;
   if (!execution || typeof execution !== 'object') throw new Error('basis.execution is required.');
-  for (const key of ['stableCorrelationIdentity', 'orchestratorIdempotencyPropagation']) {
-    if (execution[key] !== true) throw new Error(`basis.execution.${key} must be true.`);
+  for (const key of REQUIRED_EXECUTION_CERTIFICATION_FIELDS) {
+    exactBoolean(execution[key], `basis.execution.${key}`);
   }
 
   if (!basis.capabilities || typeof basis.capabilities !== 'object') throw new Error('basis.capabilities is required.');
@@ -83,6 +92,9 @@ export function validateWiserrReactivationSmsAuthorityBasis(basis) {
     if (purpose.complianceReviewStatus !== 'APPROVED') throw new Error('SMS execution capability requires approved compliance review.');
     if (!purpose.sharedCampaignAllowlisted) throw new Error('SMS execution capability requires shared-campaign allowlist approval.');
     if (!carrierVerified) throw new Error('SMS execution capability requires verified carrier campaign/consent coverage.');
+    for (const key of REQUIRED_EXECUTION_CERTIFICATION_FIELDS) {
+      if (execution[key] !== true) throw new Error(`SMS execution capability requires basis.execution.${key}=true.`);
+    }
   }
 
   return basis;
@@ -139,7 +151,11 @@ export function currentWiserrReactivationSmsObservedBasis() {
     },
     execution: {
       stableCorrelationIdentity: true,
-      orchestratorIdempotencyPropagation: true
+      orchestratorIdempotencyPropagation: true,
+      canonicalSubmissionResultClassification: false,
+      durableResultEvidenceReference: false,
+      suppressionClassificationPreserved: false,
+      ambiguousOutcomeLookupContract: false
     },
     capabilities: {
       reactivationSmsExecution: false

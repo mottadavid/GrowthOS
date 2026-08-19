@@ -7,7 +7,7 @@
   "contractVersion": "1",
   "status": "OBSERVED",
   "validatedCommitSha": "76fbac41e6d7d2080e4fd54e4a64ce12d32ba5e5",
-  "authorityFingerprint": "40f333cfe7e0847652f5184386d82520ad40d1739aabd3656b0f23f1d7fbd1e9",
+  "authorityFingerprint": "c64b5bf217729bf57d78867a085bfc8dd701f15c6dc3edef8136816d0d202f38",
   "validatedAt": "2026-08-19T02:53:00.000Z",
   "validUntil": null,
   "guardedPaths": [
@@ -34,7 +34,12 @@
       "kind": "AUTHORITY_AUDIT",
       "reference": "docs/build-os/adr/0002-reuse-existing-sms-runtime.md",
       "summary": "Wiserr doctrine requires new product SMS purposes to receive compliance review and shared-campaign allowlist review before use."
+    },
+    {
+      "kind": "AUTHORITY_GAP",
+      "reference": "wiserr-reactivation-sms-v1:return-path",
+      "summary": "GrowthOS now requires a certified canonical submission-result classification/evidence/reconciliation contract. That return-path contract has not yet been proven in Wiserr and therefore cannot support execution certification."
     }
   ],
-  "notes": "Observed only. SMS transport availability, an active LOW_VOLUME_MIXED campaign, or the existing follow_up/luna_sms purposes must not be treated as GrowthOS marketing authority. Certification requires an explicit growth_reactivation purpose, approved compliance review, shared-campaign allowlist approval, verified carrier/use-case/sample/opt-in coverage, and retained canonical send/reconciliation safeguards."
+  "notes": "Observed only. SMS transport availability, an active LOW_VOLUME_MIXED campaign, or the existing follow_up/luna_sms purposes must not be treated as GrowthOS marketing authority. Certification requires an explicit growth_reactivation purpose, approved compliance review, shared-campaign allowlist approval, verified carrier/use-case/sample/opt-in coverage, retained canonical send safeguards, canonical submission-result classification with durable evidence references, suppression classification preservation, and an ambiguity lookup/reconciliation contract."
 }

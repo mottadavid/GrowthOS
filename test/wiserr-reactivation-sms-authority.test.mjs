@@ -9,7 +9,7 @@ import {
 } from '../src/integrations/wiserr/reactivation-sms-authority.mjs';
 
 const WISERR_SHA = '76fbac41e6d7d2080e4fd54e4a64ce12d32ba5e5';
-const OBSERVED_FP = '40f333cfe7e0847652f5184386d82520ad40d1739aabd3656b0f23f1d7fbd1e9';
+const OBSERVED_FP = 'c64b5bf217729bf57d78867a085bfc8dd701f15c6dc3edef8136816d0d202f38';
 
 function receipt(overrides = {}) {
   return {
@@ -32,12 +32,43 @@ function receipt(overrides = {}) {
   };
 }
 
+function fullyEvidencedFutureBasis() {
+  const basis = currentWiserrReactivationSmsObservedBasis();
+  basis.purpose = {
+    ...basis.purpose,
+    declared: true,
+    name: 'growth_reactivation',
+    sharedCampaignAllowlisted: true,
+    complianceReviewStatus: 'APPROVED'
+  };
+  basis.carrierCoverage = {
+    status: 'VERIFIED',
+    registeredUseCaseEvidenceRef: 'wiserr://sms/use-case/1',
+    sampleMessageEvidenceRef: 'wiserr://sms/sample/1',
+    optInEvidenceRef: 'wiserr://sms/opt-in/1'
+  };
+  basis.execution = {
+    stableCorrelationIdentity: true,
+    orchestratorIdempotencyPropagation: true,
+    canonicalSubmissionResultClassification: true,
+    durableResultEvidenceReference: true,
+    suppressionClassificationPreserved: true,
+    ambiguousOutcomeLookupContract: true
+  };
+  basis.capabilities.reactivationSmsExecution = true;
+  return basis;
+}
+
 test('current audited Wiserr SMS basis is valid, deterministic, and non-executable', () => {
   const basis = currentWiserrReactivationSmsObservedBasis();
   assert.equal(validateWiserrReactivationSmsAuthorityBasis(basis), basis);
   assert.equal(basis.purpose.declared, false);
   assert.equal(basis.purpose.sharedCampaignAllowlisted, false);
   assert.equal(basis.carrierCoverage.status, 'UNVERIFIED');
+  assert.equal(basis.execution.canonicalSubmissionResultClassification, false);
+  assert.equal(basis.execution.durableResultEvidenceReference, false);
+  assert.equal(basis.execution.suppressionClassificationPreserved, false);
+  assert.equal(basis.execution.ambiguousOutcomeLookupContract, false);
   assert.equal(basis.capabilities.reactivationSmsExecution, false);
   assert.equal(wiserrReactivationSmsAuthorityFingerprint(basis), OBSERVED_FP);
 });
@@ -75,27 +106,28 @@ test('execution capability cannot be declared before purpose, review, allowlist 
   };
   cases.push(missingCarrier);
 
-  for (const basis of cases) {
-    assert.throws(() => validateWiserrReactivationSmsAuthorityBasis(basis));
+  for (const basis of cases) assert.throws(() => validateWiserrReactivationSmsAuthorityBasis(basis));
+});
+
+test('purpose, compliance and carrier approval still cannot certify execution without the canonical result/reconciliation contract', () => {
+  const basis = fullyEvidencedFutureBasis();
+  for (const field of [
+    'canonicalSubmissionResultClassification',
+    'durableResultEvidenceReference',
+    'suppressionClassificationPreserved',
+    'ambiguousOutcomeLookupContract'
+  ]) {
+    const missing = structuredClone(basis);
+    missing.execution[field] = false;
+    assert.throws(
+      () => validateWiserrReactivationSmsAuthorityBasis(missing),
+      new RegExp(`SMS execution capability requires basis\\.execution\\.${field}=true`)
+    );
   }
 });
 
-test('fully evidenced future SMS authority basis can represent execution capability', () => {
-  const basis = currentWiserrReactivationSmsObservedBasis();
-  basis.purpose = {
-    ...basis.purpose,
-    declared: true,
-    name: 'growth_reactivation',
-    sharedCampaignAllowlisted: true,
-    complianceReviewStatus: 'APPROVED'
-  };
-  basis.carrierCoverage = {
-    status: 'VERIFIED',
-    registeredUseCaseEvidenceRef: 'wiserr://sms/use-case/1',
-    sampleMessageEvidenceRef: 'wiserr://sms/sample/1',
-    optInEvidenceRef: 'wiserr://sms/opt-in/1'
-  };
-  basis.capabilities.reactivationSmsExecution = true;
+test('fully evidenced future SMS authority basis can represent execution capability only with complete outbound and return-path proof', () => {
+  const basis = fullyEvidencedFutureBasis();
   assert.equal(validateWiserrReactivationSmsAuthorityBasis(basis), basis);
   assert.notEqual(wiserrReactivationSmsAuthorityFingerprint(basis), OBSERVED_FP);
 });
@@ -106,10 +138,7 @@ test('snapshot read authority can never substitute for SMS execution authority',
     contractName: 'wiserr-growth-snapshot',
     capabilities: { readGrowthSnapshot: true }
   });
-  const decision = evaluateWiserrReactivationSmsExecutionAuthority({
-    receipt: readReceipt,
-    currentCommitSha: WISERR_SHA
-  });
+  const decision = evaluateWiserrReactivationSmsExecutionAuthority({ receipt: readReceipt, currentCommitSha: WISERR_SHA });
   assert.equal(decision.decision, 'DENY');
   assert.deepEqual(decision.reasons, ['WISERR_REACTIVATION_SMS_DEPENDENCY_MISMATCH']);
 });
