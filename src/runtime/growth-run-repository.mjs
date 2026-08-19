@@ -1,4 +1,5 @@
 import { sha256Canonical } from '../core/canonical.mjs';
+import { EXECUTION_ATTEMPT_STATES } from '../core/execution-attempts.mjs';
 import { createGrowthRunManifest, validateGrowthRunManifest } from '../core/growth-run.mjs';
 import { loadDurableWiserrGrowthSnapshot } from './wiserr-snapshot-repository.mjs';
 import { loadDurableReactivationOpportunityEvaluation } from './reactivation-opportunity-repository.mjs';
@@ -6,10 +7,31 @@ import { loadDurableReactivationCampaign } from './reactivation-campaign-reposit
 import { loadDurableExperiment } from './experiment-repository.mjs';
 import { loadDurablePolicyAuthorization } from './policy-authorization-repository.mjs';
 import { loadDurableExecutionAttempt } from './execution-attempt-repository.mjs';
+import { listDurableWiserrReactivationCommands } from './wiserr-reactivation-command-repository.mjs';
+import { listDurableWiserrSubmissionResults } from './wiserr-submission-result-ingestion.mjs';
 import { listDurableBusinessOutcomes } from './business-outcome-repository.mjs';
 import { mutateAuthoritativeRuntimeState } from './atomic-store.mjs';
 
 export const GROWTH_RUN_MANIFEST_RECORD_TYPE = 'growth_run_manifest';
+
+const COMMAND_REQUIRED_STATES = new Set([
+  EXECUTION_ATTEMPT_STATES.SUBMITTING,
+  EXECUTION_ATTEMPT_STATES.ACCEPTED,
+  EXECUTION_ATTEMPT_STATES.COMPLETED,
+  EXECUTION_ATTEMPT_STATES.DEFINITIVE_FAILURE,
+  EXECUTION_ATTEMPT_STATES.SUPPRESSED,
+  EXECUTION_ATTEMPT_STATES.RECONCILIATION_REQUIRED,
+  EXECUTION_ATTEMPT_STATES.RECONCILED_COMPLETED,
+  EXECUTION_ATTEMPT_STATES.RECONCILED_FAILED,
+  EXECUTION_ATTEMPT_STATES.NOT_ACCEPTED
+]);
+
+const REQUIRED_CANONICAL_RESULT_BY_STATE = Object.freeze({
+  [EXECUTION_ATTEMPT_STATES.ACCEPTED]: 'ACCEPTED',
+  [EXECUTION_ATTEMPT_STATES.COMPLETED]: 'COMPLETED',
+  [EXECUTION_ATTEMPT_STATES.SUPPRESSED]: 'SUPPRESSED',
+  [EXECUTION_ATTEMPT_STATES.NOT_ACCEPTED]: 'NOT_ACCEPTED'
+});
 
 function requiredString(value, label) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a non-empty string.`);
@@ -39,6 +61,63 @@ function validateRecord(record, tenantId) {
   if (!/^[0-9a-f]{64}$/.test(record.payload.sourceProofHash || '')) throw new Error('DURABLE_GROWTH_RUN_SOURCE_PROOF_HASH_INVALID');
   if (sha256Canonical(record.payload.sourceProof) !== record.payload.sourceProofHash) throw new Error('DURABLE_GROWTH_RUN_SOURCE_PROOF_MISMATCH');
   return record;
+}
+
+function assertCommandAttemptIdentity(commandRecord, action, attempt) {
+  const command = commandRecord?.payload?.command;
+  if (!command) throw new Error('DURABLE_GROWTH_RUN_EXECUTION_COMMAND_INVALID');
+  if (
+    command.tenantId !== attempt.tenantId ||
+    command.actionId !== action.actionId ||
+    command.actionHash !== attempt.actionHash ||
+    command.attemptId !== attempt.attemptId ||
+    command.attemptNumber !== attempt.attemptNumber ||
+    command.idempotencyKey !== attempt.idempotencyKey
+  ) {
+    throw new Error('DURABLE_GROWTH_RUN_EXECUTION_COMMAND_MISMATCH');
+  }
+  return command;
+}
+
+async function collectTransportProof({ store, tenantId, action, attempt }) {
+  const commandRecords = (await listDurableWiserrReactivationCommands({ store, tenantId, actionId: action.actionId }))
+    .filter(record => record.payload.command.attemptId === attempt.attemptId);
+
+  if (COMMAND_REQUIRED_STATES.has(attempt.state) && commandRecords.length === 0) {
+    throw new Error('DURABLE_GROWTH_RUN_EXECUTION_COMMAND_NOT_FOUND');
+  }
+  if (commandRecords.length > 1) throw new Error('DURABLE_GROWTH_RUN_MULTIPLE_EXECUTION_COMMANDS_FOR_ATTEMPT');
+
+  const commandRecord = commandRecords[0] ?? null;
+  if (commandRecord) assertCommandAttemptIdentity(commandRecord, action, attempt);
+
+  const resultRecords = await listDurableWiserrSubmissionResults({ store, tenantId, attemptId: attempt.attemptId });
+  for (const record of resultRecords) {
+    const result = record.payload.result;
+    if (result.commandId !== commandRecord?.payload.command.commandId) {
+      throw new Error('DURABLE_GROWTH_RUN_SUBMISSION_RESULT_COMMAND_MISMATCH');
+    }
+  }
+
+  const requiredOutcome = REQUIRED_CANONICAL_RESULT_BY_STATE[attempt.state] ?? null;
+  if (requiredOutcome && !resultRecords.some(record => record.payload.result.outcome === requiredOutcome)) {
+    throw new Error(`DURABLE_GROWTH_RUN_REQUIRED_SUBMISSION_RESULT_MISSING:${requiredOutcome}`);
+  }
+
+  return {
+    command: commandRecord ? {
+      recordId: commandRecord.recordId,
+      commandId: commandRecord.payload.command.commandId,
+      commandHash: commandRecord.payload.command.commandHash,
+      commandSemanticHash: commandRecord.payload.commandSemanticHash,
+      attemptId: commandRecord.payload.command.attemptId
+    } : null,
+    results: resultRecords.map(record => ({
+      recordId: record.recordId,
+      semanticHash: record.payload.semanticHash,
+      outcome: record.payload.result.outcome
+    })).sort((a, b) => a.recordId.localeCompare(b.recordId))
+  };
 }
 
 export async function loadDurableGrowthRunManifest({ store, tenantId, runId }) {
@@ -116,6 +195,8 @@ export async function buildAndPersistDurableGrowthRunManifest({
   }
   const resolvedRunId = runId || `growth-run-${action.actionId}`;
 
+  const transportProof = await collectTransportProof({ store, tenantId, action, attempt });
+
   const correlations = [...new Set([resolvedRunId, campaign.campaignId, experiment.experimentId, action.actionId])];
   const outcomeRecords = uniqueByRecordId((await Promise.all(
     correlations.map(correlationId => listDurableBusinessOutcomes({ store, tenantId, correlationId }))
@@ -144,6 +225,7 @@ export async function buildAndPersistDurableGrowthRunManifest({
     policyRecordHash: sha256Canonical(policyRecord.payload),
     evaluatedEnvelopeHash: policyRecord.payload.envelopeHash,
     attemptRecordHash: sha256Canonical(attemptRecord.payload),
+    transport: transportProof,
     outcomeRecordHashes: outcomeRecords.map(record => ({ recordId: record.recordId, semanticHash: record.payload.semanticHash })).sort((a, b) => a.recordId.localeCompare(b.recordId))
   };
   const sourceProofHash = sha256Canonical(sourceProof);
@@ -173,6 +255,8 @@ export async function buildAndPersistDurableGrowthRunManifest({
         sourceProofHash,
         actionId: action.actionId,
         attemptId: attempt.attemptId,
+        commandId: transportProof.command?.commandId ?? null,
+        submissionResultCount: transportProof.results.length,
         outcomeCount: outcomeRecords.length
       },
       correlationId: resolvedRunId
