@@ -105,6 +105,11 @@ export {
   createAtomicPostgresRuntimeStoreFromPool
 } from './runtime/postgres-transaction-adapter.mjs';
 export {
+  defaultMigrationDirectory,
+  discoverRuntimeMigrations,
+  runRuntimeMigrations
+} from './runtime/migrations.mjs';
+export {
   EXECUTION_ATTEMPT_RECORD_TYPE,
   loadDurableExecutionAttempt,
   listDurableExecutionAttempts,
