@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AtomicInMemoryRuntimeStore } from '../src/runtime/atomic-store.mjs';
 import { readAndPersistWiserrGrowthSnapshot } from '../src/runtime/wiserr-snapshot-repository.mjs';
-import { evaluateAndPersistCapacityBundle } from '../src/runtime/capacity-bundle-repository.mjs';
+import { evaluateAndPersistCapacityBundle, buildCapacityExecutionProof } from '../src/runtime/capacity-bundle-repository.mjs';
 import { evaluateAndPersistDurableReactivationOpportunity } from '../src/runtime/reactivation-opportunity-repository.mjs';
 import { buildReactivationPlan } from '../src/reactivation/plan.mjs';
 import {
@@ -21,14 +21,15 @@ import {
   loadDurableActionEnvelope
 } from '../src/runtime/action-envelope-repository.mjs';
 import { buildReactivationPolicyAction } from '../src/reactivation/action.mjs';
-import { actionApprovalHash } from '../src/core/canonical.mjs';
+import { actionApprovalHash, sha256Canonical } from '../src/core/canonical.mjs';
 import { evaluateAndPersistPolicyAuthorization } from '../src/runtime/policy-authorization-repository.mjs';
 import {
   createDurableExecutionAttempt,
-  markDurableExecutionSubmitting,
-  markDurableExecutionAccepted,
-  markDurableExecutionCompleted
+  markDurableExecutionSubmitting
 } from '../src/runtime/execution-attempt-repository.mjs';
+import { persistDurableWiserrReactivationCommand } from '../src/runtime/wiserr-reactivation-command-repository.mjs';
+import { ingestWiserrReactivationSubmissionResult } from '../src/runtime/wiserr-submission-result-ingestion.mjs';
+import { WISERR_REACTIVATION_SMS_DEPENDENCY_ID } from '../src/integrations/wiserr/reactivation-sms-authority.mjs';
 import { ingestDurableBusinessOutcome } from '../src/runtime/business-outcome-repository.mjs';
 import {
   buildAndPersistDurableGrowthRunManifest,
@@ -132,6 +133,10 @@ function delegation() {
   };
 }
 
+function executionRuntime(store) {
+  return Object.freeze({ schemaVersion: 1, tenantId: 'tenant-1', mode: 'EXECUTION_ENABLED', executionEnabled: true, executionBlockers: [], executionStore: store });
+}
+
 async function buildPersistedLoop() {
   const store = new AtomicInMemoryRuntimeStore();
   await readAndPersistWiserrGrowthSnapshot({
@@ -144,7 +149,8 @@ async function buildPersistedLoop() {
     transport: async () => structuredClone(snapshot()),
     now: T0
   });
-  await evaluateAndPersistCapacityBundle({ store, evidence: capacityEvidence(), authority: capacityAuthority(), now: T0 });
+  const capacityBundle = await evaluateAndPersistCapacityBundle({ store, evidence: capacityEvidence(), authority: capacityAuthority(), now: T0 });
+  const capacityProof = buildCapacityExecutionProof(capacityBundle.record, { now: T0 });
   const opportunityEvaluation = await evaluateAndPersistDurableReactivationOpportunity({
     store,
     tenantId: 'tenant-1',
@@ -256,9 +262,60 @@ async function buildPersistedLoop() {
   assert.equal(policy.decision.decision, 'ALLOW');
 
   const attempt = await createDurableExecutionAttempt({ store, action, maxAttempts: 1, now: new Date('2026-08-18T21:05:00Z') });
+  const commandBody = {
+    schemaVersion: 1,
+    commandId: `wiserr-reactivation:tenant-1:${action.actionId}:attempt:1`,
+    tenantId: 'tenant-1',
+    actionId: action.actionId,
+    actionHash: attempt.payload.actionHash,
+    campaignId: approvedCampaign.recordId,
+    opportunityId: plan.opportunityId,
+    experimentId: approvedExperiment.payload.experimentId,
+    planId: plan.planId,
+    planApprovalHash: plan.approvalHash,
+    campaignApprovalId: approvedCampaign.payload.approval.approvalId,
+    policyReceiptId: policy.record.recordId,
+    policyReceiptHash: policy.record.payload.receipt.receiptHash,
+    envelopeId: activeEnvelope.recordId,
+    envelopeHash: policy.record.payload.receipt.envelopeHash,
+    attemptId: attempt.recordId,
+    attemptNumber: attempt.payload.attemptNumber,
+    idempotencyKey: attempt.payload.idempotencyKey,
+    capacityBundleId: capacityProof.capacityBundleId,
+    capacityProofHash: capacityProof.proofHash,
+    capacitySemanticHash: capacityProof.capacitySemanticHash,
+    capacityAuthorityHash: capacityProof.authorityHash,
+    executionAuthorityDependencyId: WISERR_REACTIVATION_SMS_DEPENDENCY_ID,
+    executionAuthorityLockFingerprint: '3'.repeat(64),
+    originalBusinessSnapshotId: plan.businessSnapshotId,
+    executionBusinessSnapshotId: 'snapshot-1',
+    cohortDefinitionId: plan.cohort.definitionId,
+    cohortDefinitionVersion: plan.cohort.definitionVersion,
+    channel: plan.channel,
+    accountId: action.accountId,
+    geography: action.geography,
+    maxRecipients: plan.cohort.plannedMaxRecipients,
+    message: structuredClone(plan.message),
+    frequencyPolicy: structuredClone(plan.frequencyPolicy)
+  };
+  const command = { ...commandBody, commandHash: sha256Canonical(commandBody) };
+  await persistDurableWiserrReactivationCommand({ store, command, now: new Date('2026-08-18T21:05:30Z') });
   await markDurableExecutionSubmitting({ store, tenantId: 'tenant-1', attemptId: attempt.recordId, now: new Date('2026-08-18T21:06:00Z') });
-  await markDurableExecutionAccepted({ store, tenantId: 'tenant-1', attemptId: attempt.recordId, externalExecutionId: 'wiserr-send-1', now: new Date('2026-08-18T21:07:00Z') });
-  const completedAttempt = await markDurableExecutionCompleted({ store, tenantId: 'tenant-1', attemptId: attempt.recordId, result: { acceptedRecipients: 50 }, now: new Date('2026-08-18T21:08:00Z') });
+
+  const submissionResult = {
+    schemaVersion: 1,
+    resultId: 'wiserr-result-completed-1',
+    tenantId: 'tenant-1',
+    commandId: command.commandId,
+    attemptId: attempt.recordId,
+    outcome: 'COMPLETED',
+    classification: 'WISERR_COMPLETED',
+    evidenceRef: 'wiserr://messaging/execution/result-1',
+    externalExecutionId: 'wiserr-send-1',
+    observedAt: '2026-08-18T21:08:00.000Z'
+  };
+  const ingested = await ingestWiserrReactivationSubmissionResult({ runtime: executionRuntime(store), result: submissionResult, now: new Date('2026-08-18T21:08:00Z') });
+  const completedAttempt = ingested.attemptRecord;
 
   await ingestDurableBusinessOutcome({
     store,
@@ -282,13 +339,14 @@ async function buildPersistedLoop() {
     experimentId: approvedExperiment.recordId,
     envelopeId: activeEnvelope.recordId,
     policyReceiptId: policy.record.recordId,
-    attemptId: completedAttempt.recordId
+    attemptId: completedAttempt.recordId,
+    commandId: command.commandId,
+    resultId: submissionResult.resultId
   };
 }
 
-test('builds final durable run proof entirely from persisted authoritative records', async () => {
-  const loop = await buildPersistedLoop();
-  const result = await buildAndPersistDurableGrowthRunManifest({
+function manifestInput(loop, now = new Date('2026-08-18T21:32:00Z')) {
+  return {
     store: loop.store,
     tenantId: 'tenant-1',
     snapshotId: 'snapshot-1',
@@ -298,11 +356,19 @@ test('builds final durable run proof entirely from persisted authoritative recor
     envelopeId: loop.envelopeId,
     policyReceiptId: loop.policyReceiptId,
     attemptId: loop.attemptId,
-    now: new Date('2026-08-18T21:32:00Z')
-  });
+    now
+  };
+}
+
+test('builds final durable run proof entirely from persisted authoritative records including transport evidence', async () => {
+  const loop = await buildPersistedLoop();
+  const result = await buildAndPersistDurableGrowthRunManifest(manifestInput(loop));
   assert.equal(result.manifest.actionId, 'action-1');
   assert.equal(result.manifest.attemptState, 'COMPLETED');
   assert.equal(result.manifest.outcomeEventIds.length, 1);
+  assert.equal(result.record.payload.sourceProof.transport.command.commandId, loop.commandId);
+  assert.equal(result.record.payload.sourceProof.transport.results.length, 1);
+  assert.equal(result.record.payload.sourceProof.transport.results[0].outcome, 'COMPLETED');
   assert.match(result.record.payload.sourceProofHash, /^[0-9a-f]{64}$/);
   assert.equal(JSON.stringify(result.record).includes('PRIVATE APPROVED MESSAGE'), false);
 
@@ -310,6 +376,20 @@ test('builds final durable run proof entirely from persisted authoritative recor
   assert.equal(recovered.payload.manifestHash, result.manifest.manifestHash);
   const byAction = await listDurableGrowthRunManifests({ store: loop.store, tenantId: 'tenant-1', actionId: 'action-1' });
   assert.equal(byAction.length, 1);
+});
+
+test('completed run cannot be sealed without its exact persisted execution command', async () => {
+  const loop = await buildPersistedLoop();
+  const key = loop.store.recordKey({ tenantId: 'tenant-1', recordType: 'wiserr_reactivation_command', recordId: loop.commandId });
+  loop.store.records.delete(key);
+  await assert.rejects(() => buildAndPersistDurableGrowthRunManifest(manifestInput(loop)), /DURABLE_GROWTH_RUN_EXECUTION_COMMAND_NOT_FOUND/);
+});
+
+test('completed run cannot be sealed without its canonical COMPLETED submission result', async () => {
+  const loop = await buildPersistedLoop();
+  const key = loop.store.recordKey({ tenantId: 'tenant-1', recordType: 'wiserr_submission_result', recordId: loop.resultId });
+  loop.store.records.delete(key);
+  await assert.rejects(() => buildAndPersistDurableGrowthRunManifest(manifestInput(loop)), /DURABLE_GROWTH_RUN_REQUIRED_SUBMISSION_RESULT_MISSING:COMPLETED/);
 });
 
 test('later revocation of the live envelope does not invalidate the frozen execution authority proof', async () => {
@@ -323,31 +403,14 @@ test('later revocation of the live envelope does not invalidate the frozen execu
   const current = await loadDurableActionEnvelope({ store: loop.store, tenantId: 'tenant-1', envelopeId: loop.envelopeId });
   assert.equal(current.payload.status, 'REVOKED');
 
-  const result = await buildAndPersistDurableGrowthRunManifest({
-    store: loop.store,
-    tenantId: 'tenant-1',
-    snapshotId: 'snapshot-1',
-    opportunityEvaluationId: loop.opportunityEvaluationId,
-    campaignId: loop.campaignId,
-    experimentId: loop.experimentId,
-    envelopeId: loop.envelopeId,
-    policyReceiptId: loop.policyReceiptId,
-    attemptId: loop.attemptId,
-    now: new Date('2026-08-18T21:41:00Z')
-  });
+  const result = await buildAndPersistDurableGrowthRunManifest(manifestInput(loop, new Date('2026-08-18T21:41:00Z')));
   assert.equal(result.manifest.envelopeId, 'envelope-1');
   assert.equal(result.manifest.attemptState, 'COMPLETED');
 });
 
 test('same run ID cannot be rebuilt with changed durable outcome semantics', async () => {
   const loop = await buildPersistedLoop();
-  const first = await buildAndPersistDurableGrowthRunManifest({
-    store: loop.store,
-    tenantId: 'tenant-1', snapshotId: 'snapshot-1', opportunityEvaluationId: loop.opportunityEvaluationId,
-    campaignId: loop.campaignId, experimentId: loop.experimentId, envelopeId: loop.envelopeId,
-    policyReceiptId: loop.policyReceiptId, attemptId: loop.attemptId,
-    now: new Date('2026-08-18T21:32:00Z')
-  });
+  const first = await buildAndPersistDurableGrowthRunManifest(manifestInput(loop));
   await ingestDurableBusinessOutcome({
     store: loop.store,
     tenantId: 'tenant-1', correlationId: 'action-1', sourceSystem: 'wiserr', canonicalOutcomeId: 'booking-2',
@@ -356,13 +419,7 @@ test('same run ID cannot be rebuilt with changed durable outcome semantics', asy
     occurredAt: new Date('2026-08-18T21:50:00Z'), recordedAt: new Date('2026-08-18T21:51:00Z')
   });
   await assert.rejects(
-    () => buildAndPersistDurableGrowthRunManifest({
-      store: loop.store,
-      tenantId: 'tenant-1', snapshotId: 'snapshot-1', opportunityEvaluationId: loop.opportunityEvaluationId,
-      campaignId: loop.campaignId, experimentId: loop.experimentId, envelopeId: loop.envelopeId,
-      policyReceiptId: loop.policyReceiptId, attemptId: loop.attemptId, runId: first.manifest.runId,
-      now: new Date('2026-08-18T21:52:00Z')
-    }),
+    () => buildAndPersistDurableGrowthRunManifest({ ...manifestInput(loop, new Date('2026-08-18T21:52:00Z')), runId: first.manifest.runId }),
     /DURABLE_GROWTH_RUN_MANIFEST_CONFLICT/
   );
 });
