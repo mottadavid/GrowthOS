@@ -2,11 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   currentWiserrGrowthSnapshotProducerBasis,
+  candidateWiserrGrowthSnapshotMountedBasis,
   validateWiserrGrowthSnapshotAuthorityBasis,
   wiserrGrowthSnapshotAuthorityFingerprint
 } from '../src/integrations/wiserr/growth-snapshot-authority.mjs';
 
 const CURRENT_UNMOUNTED_FINGERPRINT = '5682a8ce6223466f7f391929d5957515fef34c918cacc52a202041324f2c1588';
+const CANDIDATE_MOUNTED_FINGERPRINT = 'dc668aba790e96d633f0faba1ab6bdcfd96123cf1ff034b10a7655d13d9b683a';
 
 test('current unmounted producer basis guards only the actual audited producer surfaces', () => {
   const basis = currentWiserrGrowthSnapshotProducerBasis();
@@ -31,6 +33,39 @@ test('same semantic basis yields the pinned deterministic unmounted-producer fin
   assert.equal(wiserrGrowthSnapshotAuthorityFingerprint(first), CURRENT_UNMOUNTED_FINGERPRINT);
 });
 
+test('candidate mounted basis pins the exact route, mount, auth and privacy authority without execution authority', () => {
+  const basis = candidateWiserrGrowthSnapshotMountedBasis();
+  assert.equal(validateWiserrGrowthSnapshotAuthorityBasis(basis), basis);
+  assert.equal(basis.readSurface.mounted, true);
+  assert.equal(basis.readSurface.routeOrService, 'GET /api/tenant/growth/snapshot?dormantDays=<1..3650>');
+  assert.equal(basis.readSurface.authAuthority, 'requireAuth -> setTenantFromToken -> rejectTenantParam -> owner/admin/super_admin');
+  assert.equal(basis.capabilities.readGrowthSnapshot, true);
+  assert.equal(basis.capabilities.reactivationSmsExecution, false);
+  assert.equal(basis.capabilities.reactivationEmailExecution, false);
+  assert.equal(basis.capabilities.lunaCampaignContext, false);
+  assert.equal(basis.capabilities.canonicalBookingOutcomeEvents, false);
+  assert.equal(basis.capabilities.canonicalWonRevenueOutcomeEvents, false);
+  assert.deepEqual([...basis.guardedPaths].sort(), [
+    'docs/growth/GROWTHOS_READ_CONTRACT.md',
+    'server/authMiddleware.ts',
+    'server/growth/growthSnapshotService.ts',
+    'server/index.ts',
+    'server/middleware/rejectTenantParam.ts',
+    'server/routes/growthSnapshotRoute.ts',
+    'server/routes/tenantProfileRoute.ts',
+    'tests/growth/growthSnapshotRoute.test.ts',
+    'tests/growth/growthSnapshotService.test.ts'
+  ]);
+  assert.equal(wiserrGrowthSnapshotAuthorityFingerprint(basis), CANDIDATE_MOUNTED_FINGERPRINT);
+});
+
+test('same mounted semantics remain deterministic regardless of guarded path order', () => {
+  const basis = candidateWiserrGrowthSnapshotMountedBasis();
+  const reversed = structuredClone(basis);
+  reversed.guardedPaths.reverse();
+  assert.equal(wiserrGrowthSnapshotAuthorityFingerprint(reversed), CANDIDATE_MOUNTED_FINGERPRINT);
+});
+
 test('non-semantic implementation metadata does not change the contract fingerprint', () => {
   const basis = currentWiserrGrowthSnapshotProducerBasis();
   const withImplementationDetail = {
@@ -53,19 +88,11 @@ test('cohort semantic change changes the fingerprint', () => {
   );
 });
 
-test('mounting a certified read surface changes the fingerprint and requires route surfaces to be guarded', () => {
-  const basis = currentWiserrGrowthSnapshotProducerBasis();
-  const mounted = structuredClone(basis);
-  mounted.guardedPaths.push('server/routes/tenantInfoRoutes.ts');
-  mounted.readSurface = {
-    mounted: true,
-    authAuthority: 'WISERR_OWNER_ADMIN_JWT',
-    routeOrService: 'GET /api/tenant/growth/snapshot'
-  };
-  mounted.capabilities.readGrowthSnapshot = true;
-
+test('mounting a read surface changes the fingerprint and contradictory capability fails closed', () => {
+  const unmounted = currentWiserrGrowthSnapshotProducerBasis();
+  const mounted = candidateWiserrGrowthSnapshotMountedBasis();
   assert.notEqual(
-    wiserrGrowthSnapshotAuthorityFingerprint(basis),
+    wiserrGrowthSnapshotAuthorityFingerprint(unmounted),
     wiserrGrowthSnapshotAuthorityFingerprint(mounted)
   );
 
