@@ -90,8 +90,15 @@ test('explicit execution request cannot override deployment read-only kill switc
     assert.equal(runtime.mode, RUNTIME_MODES.READ_ONLY);
     assert.equal(runtime.executionEnabled, false);
     assert.deepEqual(runtime.executionBlockers, ['DEPLOYMENT_EXECUTION_DISABLED']);
-    const error = assert.throws(() => assertExecutionRuntime(runtime), /GROWTHOS_RUNTIME_EXECUTION_DISABLED/);
-    assert.deepEqual(error.executionBlockers, ['DEPLOYMENT_EXECUTION_DISABLED']);
+
+    let caught = null;
+    try {
+      assertExecutionRuntime(runtime);
+    } catch (error) {
+      caught = error;
+    }
+    assert.equal(caught?.code, 'GROWTHOS_RUNTIME_EXECUTION_DISABLED');
+    assert.deepEqual(caught?.executionBlockers, ['DEPLOYMENT_EXECUTION_DISABLED']);
   } finally { await temp.cleanup(); }
 });
 
