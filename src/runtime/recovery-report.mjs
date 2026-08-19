@@ -6,6 +6,7 @@ const EXPERIMENT_RECORD_TYPE = 'experiment';
 const ENVELOPE_RECORD_TYPE = 'action_envelope';
 const ATTEMPT_RECORD_TYPE = 'execution_attempt';
 const COMMAND_RECORD_TYPE = 'wiserr_reactivation_command';
+const RESULT_RECORD_TYPE = 'wiserr_submission_result';
 
 function requiredString(value, label) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a non-empty string.`);
@@ -27,14 +28,45 @@ async function scan(store, tenantId, recordType) {
   return { records, potentiallyTruncated: records.length === SCAN_LIMIT };
 }
 
+function resultAppliedToAttempt(result, attempt) {
+  if (!result || !attempt) return false;
+  const state = attempt.state;
+  if (result.outcome === 'ACCEPTED') {
+    return [
+      EXECUTION_ATTEMPT_STATES.ACCEPTED,
+      EXECUTION_ATTEMPT_STATES.COMPLETED,
+      EXECUTION_ATTEMPT_STATES.DEFINITIVE_FAILURE,
+      EXECUTION_ATTEMPT_STATES.RECONCILIATION_REQUIRED,
+      EXECUTION_ATTEMPT_STATES.RECONCILED_COMPLETED,
+      EXECUTION_ATTEMPT_STATES.RECONCILED_FAILED
+    ].includes(state);
+  }
+  if (result.outcome === 'COMPLETED') return [EXECUTION_ATTEMPT_STATES.COMPLETED, EXECUTION_ATTEMPT_STATES.RECONCILED_COMPLETED].includes(state);
+  if (result.outcome === 'SUPPRESSED') return state === EXECUTION_ATTEMPT_STATES.SUPPRESSED;
+  if (result.outcome === 'NOT_ACCEPTED') return state === EXECUTION_ATTEMPT_STATES.NOT_ACCEPTED;
+  if (result.outcome === 'DEFINITIVE_FAILURE') return state === EXECUTION_ATTEMPT_STATES.DEFINITIVE_FAILURE;
+  if (result.outcome === 'AMBIGUOUS') return [EXECUTION_ATTEMPT_STATES.RECONCILIATION_REQUIRED, EXECUTION_ATTEMPT_STATES.RECONCILED_COMPLETED, EXECUTION_ATTEMPT_STATES.RECONCILED_FAILED].includes(state);
+  return false;
+}
+
+function resultCanApplyFromState(result, attempt) {
+  if (!result || !attempt) return false;
+  if (result.outcome === 'ACCEPTED') return attempt.state === EXECUTION_ATTEMPT_STATES.SUBMITTING;
+  if (result.outcome === 'COMPLETED') return [EXECUTION_ATTEMPT_STATES.SUBMITTING, EXECUTION_ATTEMPT_STATES.ACCEPTED].includes(attempt.state);
+  if (['SUPPRESSED', 'NOT_ACCEPTED'].includes(result.outcome)) return attempt.state === EXECUTION_ATTEMPT_STATES.SUBMITTING;
+  if (['DEFINITIVE_FAILURE', 'AMBIGUOUS'].includes(result.outcome)) return [EXECUTION_ATTEMPT_STATES.SUBMITTING, EXECUTION_ATTEMPT_STATES.ACCEPTED].includes(attempt.state);
+  return false;
+}
+
 export async function buildTenantRecoveryReport({ store, tenantId, now = new Date() }) {
   if (!store || typeof store.listRecords !== 'function') throw new Error('store with listRecords() is required.');
   requiredString(tenantId, 'tenantId');
   const current = validNow(now);
 
-  const [attempts, commands, campaigns, experiments, envelopes] = await Promise.all([
+  const [attempts, commands, results, campaigns, experiments, envelopes] = await Promise.all([
     scan(store, tenantId, ATTEMPT_RECORD_TYPE),
     scan(store, tenantId, COMMAND_RECORD_TYPE),
+    scan(store, tenantId, RESULT_RECORD_TYPE),
     scan(store, tenantId, CAMPAIGN_RECORD_TYPE),
     scan(store, tenantId, EXPERIMENT_RECORD_TYPE),
     scan(store, tenantId, ENVELOPE_RECORD_TYPE)
@@ -42,14 +74,57 @@ export async function buildTenantRecoveryReport({ store, tenantId, now = new Dat
 
   const findings = [];
   const attemptsById = new Map(attempts.records.map(record => [record.recordId, record]));
+  const resultsByAttempt = new Map();
+  for (const record of results.records) {
+    const attemptId = record.payload?.result?.attemptId;
+    if (!attemptId) continue;
+    const list = resultsByAttempt.get(attemptId) || [];
+    list.push(record);
+    resultsByAttempt.set(attemptId, list);
+  }
 
   for (const record of attempts.records) {
     const attempt = record.payload;
+    const attemptResults = resultsByAttempt.get(record.recordId) || [];
     const base = { recordType: ATTEMPT_RECORD_TYPE, recordId: record.recordId, state: attempt?.state ?? 'UNKNOWN', actionId: attempt?.actionId ?? null };
-    if (attempt?.state === EXECUTION_ATTEMPT_STATES.CREATED) findings.push(finding({ ...base, severity: 'ATTENTION', code: 'ATTEMPT_CREATED_REVALIDATE_BEFORE_SUBMIT' }));
-    else if (attempt?.state === EXECUTION_ATTEMPT_STATES.SUBMITTING) findings.push(finding({ ...base, severity: 'BLOCKING', code: 'ATTEMPT_SUBMITTING_OUTCOME_UNKNOWN' }));
-    else if (attempt?.state === EXECUTION_ATTEMPT_STATES.ACCEPTED) findings.push(finding({ ...base, severity: 'BLOCKING', code: 'ATTEMPT_ACCEPTED_NOT_FINAL' }));
-    else if (attempt?.state === EXECUTION_ATTEMPT_STATES.RECONCILIATION_REQUIRED) findings.push(finding({ ...base, severity: 'BLOCKING', code: 'ATTEMPT_RECONCILIATION_REQUIRED' }));
+    if (attempt?.state === EXECUTION_ATTEMPT_STATES.CREATED) {
+      findings.push(finding({ ...base, severity: 'ATTENTION', code: 'ATTEMPT_CREATED_REVALIDATE_BEFORE_SUBMIT' }));
+    } else if (attempt?.state === EXECUTION_ATTEMPT_STATES.SUBMITTING) {
+      if (attemptResults.length === 0) findings.push(finding({ ...base, severity: 'BLOCKING', code: 'ATTEMPT_SUBMITTING_OUTCOME_UNKNOWN' }));
+    } else if (attempt?.state === EXECUTION_ATTEMPT_STATES.ACCEPTED) {
+      const laterResultExists = attemptResults.some(item => ['COMPLETED', 'DEFINITIVE_FAILURE', 'AMBIGUOUS'].includes(item.payload?.result?.outcome));
+      if (!laterResultExists) findings.push(finding({ ...base, severity: 'BLOCKING', code: 'ATTEMPT_ACCEPTED_NOT_FINAL' }));
+    } else if (attempt?.state === EXECUTION_ATTEMPT_STATES.RECONCILIATION_REQUIRED) {
+      findings.push(finding({ ...base, severity: 'BLOCKING', code: 'ATTEMPT_RECONCILIATION_REQUIRED' }));
+    }
+  }
+
+  for (const record of results.records) {
+    const result = record.payload?.result;
+    const attempt = result?.attemptId ? attemptsById.get(result.attemptId)?.payload : null;
+    const base = {
+      recordType: RESULT_RECORD_TYPE,
+      recordId: record.recordId,
+      state: attempt?.state ?? 'NO_MATCHING_ATTEMPT',
+      actionId: attempt?.actionId ?? null,
+      details: {
+        resultId: result?.resultId ?? null,
+        commandId: result?.commandId ?? null,
+        attemptId: result?.attemptId ?? null,
+        outcome: result?.outcome ?? null,
+        classification: result?.classification ?? null,
+        evidenceRef: result?.evidenceRef ?? null
+      }
+    };
+    if (!attempt) {
+      findings.push(finding({ ...base, severity: 'BLOCKING', code: 'PERSISTED_RESULT_WITHOUT_MATCHING_ATTEMPT' }));
+    } else if (resultAppliedToAttempt(result, attempt)) {
+      // Exact result evidence has already been reflected in durable attempt state.
+    } else if (resultCanApplyFromState(result, attempt)) {
+      findings.push(finding({ ...base, severity: 'ATTENTION', code: 'PERSISTED_RESULT_APPLY_DETERMINISTICALLY' }));
+    } else {
+      findings.push(finding({ ...base, severity: 'BLOCKING', code: 'PERSISTED_RESULT_ATTEMPT_STATE_CONFLICT' }));
+    }
   }
 
   for (const record of commands.records) {
@@ -95,6 +170,7 @@ export async function buildTenantRecoveryReport({ store, tenantId, now = new Dat
   const scanned = [
     [ATTEMPT_RECORD_TYPE, attempts],
     [COMMAND_RECORD_TYPE, commands],
+    [RESULT_RECORD_TYPE, results],
     [CAMPAIGN_RECORD_TYPE, campaigns],
     [EXPERIMENT_RECORD_TYPE, experiments],
     [ENVELOPE_RECORD_TYPE, envelopes]
@@ -105,6 +181,7 @@ export async function buildTenantRecoveryReport({ store, tenantId, now = new Dat
   const attentionCount = findings.filter(item => item.severity === 'ATTENTION').length;
   const unresolvedAttemptCount = findings.filter(item => item.recordType === ATTEMPT_RECORD_TYPE).length;
   const persistedCommandFindingCount = findings.filter(item => item.recordType === COMMAND_RECORD_TYPE).length;
+  const persistedResultFindingCount = findings.filter(item => item.recordType === RESULT_RECORD_TYPE).length;
 
   return {
     schemaVersion: 1,
@@ -113,7 +190,7 @@ export async function buildTenantRecoveryReport({ store, tenantId, now = new Dat
     mode: 'READ_ONLY',
     safeForUnattendedRecovery: coverageComplete && findings.length === 0,
     requiresHumanOrDeterministicRevalidation: !coverageComplete || findings.length > 0,
-    summary: { blockingCount, attentionCount, unresolvedAttemptCount, persistedCommandFindingCount, findingCount: findings.length },
+    summary: { blockingCount, attentionCount, unresolvedAttemptCount, persistedCommandFindingCount, persistedResultFindingCount, findingCount: findings.length },
     coverage,
     findings
   };
