@@ -4,8 +4,8 @@ export { AUTONOMY_LEVELS, validateActionEnvelope, validateActionRequest, validat
 export {
   EXECUTION_ATTEMPT_STATES, hasUnresolvedExecutionAttempt, assertExecutionAttemptAvailable,
   createExecutionAttempt, markExecutionSubmitting, markExecutionAccepted, markExecutionCompleted,
-  markExecutionDefinitiveFailure, markExecutionNotAccepted, markExecutionReconciliationRequired,
-  reconcileExecutionAttempt, classifyUnexpectedExecutionError
+  markExecutionDefinitiveFailure, markExecutionSuppressed, markExecutionNotAccepted,
+  markExecutionReconciliationRequired, reconcileExecutionAttempt, classifyUnexpectedExecutionError
 } from './core/execution-attempts.mjs';
 export { validateGrowthEvent, createGrowthEvent, appendGrowthEvent, buildGrowthTrace, validateOutcomeAttribution, createOutcomeEvent, summarizeOutcomeTrace } from './core/growth-events.mjs';
 export { UPSTREAM_AUTHORITY_STATES, UPSTREAM_AUTHORITY_DECISIONS, validateUpstreamAuthorityReceipt, upstreamAuthorityLockFingerprint, evaluateUpstreamAuthority } from './core/upstream-authority.mjs';
@@ -27,8 +27,8 @@ export { RUNTIME_MODES, bootstrapTenantRuntime, assertExecutionRuntime } from '.
 export {
   EXECUTION_ATTEMPT_RECORD_TYPE, loadDurableExecutionAttempt, listDurableExecutionAttempts,
   createDurableExecutionAttempt, markDurableExecutionSubmitting, markDurableExecutionAccepted,
-  markDurableExecutionCompleted, markDurableExecutionDefinitiveFailure, markDurableExecutionNotAccepted,
-  markDurableExecutionReconciliationRequired, reconcileDurableExecutionAttempt
+  markDurableExecutionCompleted, markDurableExecutionDefinitiveFailure, markDurableExecutionSuppressed,
+  markDurableExecutionNotAccepted, markDurableExecutionReconciliationRequired, reconcileDurableExecutionAttempt
 } from './runtime/execution-attempt-repository.mjs';
 export {
   WISERR_REACTIVATION_COMMAND_RECORD_TYPE, loadDurableWiserrReactivationCommand,
