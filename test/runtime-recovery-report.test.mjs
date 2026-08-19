@@ -11,6 +11,9 @@ async function put(store, recordType, recordId, payload) {
 function commandPayload({ attemptId = 'attempt-1', actionId = 'action-1', campaignId = 'campaign-1' } = {}) {
   return { command: { commandId: `command-${actionId}`, attemptId, actionId, campaignId, commandHash: 'a'.repeat(64) } };
 }
+function resultPayload({ resultId = 'result-1', attemptId = 'attempt-1', commandId = 'command-action-1', outcome = 'ACCEPTED', classification = 'WISERR_ACCEPTED' } = {}) {
+  return { result: { resultId, attemptId, commandId, tenantId: 'tenant-1', outcome, classification, evidenceRef: `wiserr://result/${resultId}` } };
+}
 
 test('terminal tenant runtime state is safe for unattended recovery inspection', async () => {
   const store = new AtomicInMemoryRuntimeStore();
@@ -26,9 +29,7 @@ test('suppressed attempt is terminal recovery evidence, not ambiguous work', asy
   const store = new AtomicInMemoryRuntimeStore();
   await put(store, 'execution_attempt', 'attempt-1', { state: 'SUPPRESSED', actionId: 'action-1', suppression: { classification: 'RECIPIENT_OR_COMPLIANCE_SUPPRESSED' } });
   const report = await buildTenantRecoveryReport({ store, tenantId: 'tenant-1', now: NOW });
-  assert.equal(report.safeForUnattendedRecovery, true);
-  assert.equal(report.summary.unresolvedAttemptCount, 0);
-  assert.equal(report.summary.findingCount, 0);
+  assert.equal(report.safeForUnattendedRecovery, true); assert.equal(report.summary.unresolvedAttemptCount, 0); assert.equal(report.summary.findingCount, 0);
 });
 
 test('created attempt survives restart as revalidation work and is never auto-resumed', async () => {
@@ -51,12 +52,39 @@ test('persisted command without matching durable attempt is blocking', async () 
   assert.equal(report.safeForUnattendedRecovery, false); assert.ok(report.findings.some(item => item.code === 'PERSISTED_COMMAND_WITHOUT_MATCHING_ATTEMPT' && item.severity === 'BLOCKING'));
 });
 
-test('submitting accepted and reconciliation-required attempts are blocking', async () => {
+test('submitting accepted and reconciliation-required attempts are blocking when no result receipt resolves the local crash window', async () => {
   const store = new AtomicInMemoryRuntimeStore();
   for (const [id, state] of [['a1', 'SUBMITTING'], ['a2', 'ACCEPTED'], ['a3', 'RECONCILIATION_REQUIRED']]) await put(store, 'execution_attempt', id, { state, actionId: `action-${id}` });
   const report = await buildTenantRecoveryReport({ store, tenantId: 'tenant-1', now: NOW });
   assert.equal(report.summary.blockingCount, 3); assert.equal(report.safeForUnattendedRecovery, false);
   assert.deepEqual(new Set(report.findings.map(item => item.code)), new Set(['ATTEMPT_SUBMITTING_OUTCOME_UNKNOWN','ATTEMPT_ACCEPTED_NOT_FINAL','ATTEMPT_RECONCILIATION_REQUIRED']));
+});
+
+test('received result with SUBMITTING attempt is deterministic local reapply work, not unknown external outcome', async () => {
+  const store = new AtomicInMemoryRuntimeStore();
+  await put(store, 'execution_attempt', 'attempt-1', { state: 'SUBMITTING', actionId: 'action-1' });
+  await put(store, 'wiserr_submission_result', 'result-1', resultPayload());
+  const report = await buildTenantRecoveryReport({ store, tenantId: 'tenant-1', now: NOW });
+  assert.equal(report.safeForUnattendedRecovery, false);
+  assert.equal(report.summary.persistedResultFindingCount, 1);
+  assert.ok(report.findings.some(item => item.code === 'PERSISTED_RESULT_APPLY_DETERMINISTICALLY' && item.severity === 'ATTENTION'));
+  assert.equal(report.findings.some(item => item.code === 'ATTEMPT_SUBMITTING_OUTCOME_UNKNOWN'), false);
+});
+
+test('received result without matching durable attempt is blocking evidence', async () => {
+  const store = new AtomicInMemoryRuntimeStore();
+  await put(store, 'wiserr_submission_result', 'result-1', resultPayload({ attemptId: 'missing-attempt' }));
+  const report = await buildTenantRecoveryReport({ store, tenantId: 'tenant-1', now: NOW });
+  assert.ok(report.findings.some(item => item.code === 'PERSISTED_RESULT_WITHOUT_MATCHING_ATTEMPT' && item.severity === 'BLOCKING'));
+});
+
+test('persisted result already reflected in terminal attempt state creates no result finding', async () => {
+  const store = new AtomicInMemoryRuntimeStore();
+  await put(store, 'execution_attempt', 'attempt-1', { state: 'SUPPRESSED', actionId: 'action-1', suppression: { classification: 'RECIPIENT_OPTED_OUT' } });
+  await put(store, 'wiserr_submission_result', 'result-1', resultPayload({ outcome: 'SUPPRESSED', classification: 'RECIPIENT_OPTED_OUT' }));
+  const report = await buildTenantRecoveryReport({ store, tenantId: 'tenant-1', now: NOW });
+  assert.equal(report.summary.persistedResultFindingCount, 0);
+  assert.equal(report.safeForUnattendedRecovery, true);
 });
 
 test('persisted command tied to unresolved external attempt remains blocking', async () => {
@@ -90,6 +118,7 @@ test('potentially truncated recovery coverage refuses to declare recovery safe',
 
 test('report is read-only and requires only tenant-scoped record listing', async () => {
   let calls = 0;
-  const store = { async listRecords({ tenantId, recordType }) { calls += 1; assert.equal(tenantId, 'tenant-1'); assert.ok(['execution_attempt', 'wiserr_reactivation_command', 'reactivation_campaign', 'experiment', 'action_envelope'].includes(recordType)); return []; } };
-  const report = await buildTenantRecoveryReport({ store, tenantId: 'tenant-1', now: NOW }); assert.equal(calls, 5); assert.equal(report.safeForUnattendedRecovery, true);
+  const allowed = ['execution_attempt', 'wiserr_reactivation_command', 'wiserr_submission_result', 'reactivation_campaign', 'experiment', 'action_envelope'];
+  const store = { async listRecords({ tenantId, recordType }) { calls += 1; assert.equal(tenantId, 'tenant-1'); assert.ok(allowed.includes(recordType)); return []; } };
+  const report = await buildTenantRecoveryReport({ store, tenantId: 'tenant-1', now: NOW }); assert.equal(calls, 6); assert.equal(report.safeForUnattendedRecovery, true);
 });
