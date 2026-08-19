@@ -67,11 +67,6 @@ export function evaluateRuntimeDatabaseEvidence({ migrations, appliedMigrations,
 
 async function collectEvidence({ client, directory }) {
   const migrations = await discoverRuntimeMigrations({ directory });
-  const applied = await client.query(
-    `SELECT migration_name, checksum, applied_at
-       FROM growthos_schema_migrations
-      ORDER BY migration_name ASC`
-  );
   const tableRows = await client.query(
     `SELECT table_name
        FROM information_schema.tables
@@ -79,6 +74,17 @@ async function collectEvidence({ client, directory }) {
         AND table_name = ANY($1::text[])`,
     [REQUIRED_TABLES]
   );
+  const tables = (tableRows.rows || []).map(row => row.table_name);
+  const tableSet = new Set(tables);
+
+  const applied = tableSet.has('growthos_schema_migrations')
+    ? await client.query(
+        `SELECT migration_name, checksum, applied_at
+           FROM growthos_schema_migrations
+          ORDER BY migration_name ASC`
+      )
+    : { rows: [] };
+
   const columnRows = await client.query(
     `SELECT table_name, column_name
        FROM information_schema.columns
@@ -103,7 +109,7 @@ async function collectEvidence({ client, directory }) {
     await client.query('ROLLBACK');
     const probe = await client.query("SELECT to_regclass('pg_temp.growthos_transaction_probe') AS regclass");
     rollbackVerified = (probe.rows?.[0]?.regclass ?? null) === null;
-  } catch (error) {
+  } catch {
     try { await client.query('ROLLBACK'); } catch {}
     rollbackVerified = false;
   }
@@ -117,7 +123,7 @@ async function collectEvidence({ client, directory }) {
   return {
     migrations,
     appliedMigrations: applied.rows || [],
-    tables: (tableRows.rows || []).map(row => row.table_name),
+    tables,
     columns,
     indexes: (indexRows.rows || []).map(row => row.indexname),
     rollbackVerified
