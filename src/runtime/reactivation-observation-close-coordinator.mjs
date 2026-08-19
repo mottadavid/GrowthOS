@@ -25,21 +25,11 @@ function assertIdentity({ command, campaign, experiment, tenantId }) {
     command.experimentId !== experiment.experimentId ||
     experiment.opportunityId !== command.opportunityId ||
     experiment.businessSnapshotId !== command.originalBusinessSnapshotId
-  ) {
-    throw new Error('REACTIVATION_OBSERVATION_IDENTITY_MISMATCH');
-  }
+  ) throw new Error('REACTIVATION_OBSERVATION_IDENTITY_MISMATCH');
 }
 
 function terminalExperiment(experiment) {
   return ['COMPLETED', 'INCONCLUSIVE', 'STOPPED'].includes(experiment.state);
-}
-
-function assertTerminalCampaignMatchesExperiment(campaign, experiment) {
-  if (experiment.state === 'STOPPED') {
-    if (campaign.status !== 'STOPPED') throw new Error(`REACTIVATION_OBSERVATION_CAMPAIGN_STATE_CONFLICT:${campaign.status}`);
-    return;
-  }
-  if (campaign.status !== 'COMPLETED') throw new Error(`REACTIVATION_OBSERVATION_CAMPAIGN_STATE_CONFLICT:${campaign.status}`);
 }
 
 function stopReason(experiment) {
@@ -47,13 +37,35 @@ function stopReason(experiment) {
   return `EXPERIMENT_${experiment.closeDecision || 'STOPPED'}:${reason}`;
 }
 
-export async function evaluateReactivationObservationAndCloseCampaign({
-  runtime,
-  tenantId,
-  commandId,
-  observation = null,
-  now = new Date()
-}) {
+async function finishCampaignFromTerminalExperiment({ store, tenantId, campaignRecord, experimentRecord, now }) {
+  const campaign = campaignRecord.payload;
+  const experiment = experimentRecord.payload;
+  if (experiment.state === 'STOPPED') {
+    if (campaign.status === 'OBSERVING') {
+      return {
+        record: await stopDurableReactivationCampaign({ store, tenantId, campaignId: campaign.campaignId, reason: stopReason(experiment), now }),
+        transitioned: true
+      };
+    }
+    if (campaign.status !== 'STOPPED') throw new Error(`REACTIVATION_OBSERVATION_CAMPAIGN_STATE_CONFLICT:${campaign.status}`);
+    if (campaign.stopReason !== stopReason(experiment)) throw new Error('REACTIVATION_OBSERVATION_CAMPAIGN_STOP_REASON_CONFLICT');
+    return { record: campaignRecord, transitioned: false };
+  }
+
+  if (['COMPLETED', 'INCONCLUSIVE'].includes(experiment.state)) {
+    if (campaign.status === 'OBSERVING') {
+      return {
+        record: await completeDurableReactivationCampaign({ store, tenantId, campaignId: campaign.campaignId, now }),
+        transitioned: true
+      };
+    }
+    if (campaign.status !== 'COMPLETED') throw new Error(`REACTIVATION_OBSERVATION_CAMPAIGN_STATE_CONFLICT:${campaign.status}`);
+    return { record: campaignRecord, transitioned: false };
+  }
+  throw new Error(`REACTIVATION_OBSERVATION_TERMINAL_EXPERIMENT_UNSUPPORTED:${experiment.state}`);
+}
+
+export async function evaluateReactivationObservationAndCloseCampaign({ runtime, tenantId, commandId, observation = null, now = new Date() }) {
   requiredString(tenantId, 'tenantId');
   requiredString(commandId, 'commandId');
   if (runtime?.tenantId !== tenantId) throw new Error('REACTIVATION_OBSERVATION_RUNTIME_TENANT_MISMATCH');
@@ -70,25 +82,23 @@ export async function evaluateReactivationObservationAndCloseCampaign({
   assertIdentity({ command, campaign: campaignRecord.payload, experiment: experimentRecord.payload, tenantId });
 
   if (terminalExperiment(experimentRecord.payload)) {
-    assertTerminalCampaignMatchesExperiment(campaignRecord.payload, experimentRecord.payload);
+    const finished = await finishCampaignFromTerminalExperiment({ store, tenantId, campaignRecord, experimentRecord, now });
+    campaignRecord = finished.record;
     return {
-      schemaVersion: 1,
-      tenantId,
-      commandId,
+      schemaVersion: 1, tenantId, commandId,
       campaignId: campaignRecord.recordId,
       experimentId: experimentRecord.recordId,
       experimentState: experimentRecord.payload.state,
       experimentDecision: experimentRecord.payload.closeDecision,
       campaignState: campaignRecord.payload.status,
       closed: true,
-      idempotent: true,
+      idempotent: !finished.transitioned,
+      campaignTransitioned: finished.transitioned,
       evidenceRefs: [...(experimentRecord.payload.closeEvidenceRefs || [])]
     };
   }
 
-  if (campaignRecord.payload.status !== 'OBSERVING') {
-    throw new Error(`REACTIVATION_OBSERVATION_CAMPAIGN_NOT_OBSERVING:${campaignRecord.payload.status}`);
-  }
+  if (campaignRecord.payload.status !== 'OBSERVING') throw new Error(`REACTIVATION_OBSERVATION_CAMPAIGN_NOT_OBSERVING:${campaignRecord.payload.status}`);
   if (!observation || typeof observation !== 'object') throw new Error('observation is required while experiment is open.');
 
   if (experimentRecord.payload.state === 'RUNNING') {
@@ -97,19 +107,10 @@ export async function evaluateReactivationObservationAndCloseCampaign({
     throw new Error(`REACTIVATION_OBSERVATION_EXPERIMENT_STATE_CONFLICT:${experimentRecord.payload.state}`);
   }
 
-  const evaluated = await evaluateAndCloseDurableExperiment({
-    store,
-    tenantId,
-    experimentId: command.experimentId,
-    observation,
-    now
-  });
-
+  const evaluated = await evaluateAndCloseDurableExperiment({ store, tenantId, experimentId: command.experimentId, observation, now });
   if (!evaluated.closed) {
     return {
-      schemaVersion: 1,
-      tenantId,
-      commandId,
+      schemaVersion: 1, tenantId, commandId,
       campaignId: campaignRecord.recordId,
       experimentId: experimentRecord.recordId,
       experimentState: evaluated.record.payload.state,
@@ -117,29 +118,16 @@ export async function evaluateReactivationObservationAndCloseCampaign({
       campaignState: campaignRecord.payload.status,
       closed: false,
       idempotent: false,
+      campaignTransitioned: false,
       evidenceRefs: [...evaluated.evaluation.evidenceRefs]
     };
   }
 
   experimentRecord = evaluated.record;
-  if (experimentRecord.payload.state === 'STOPPED') {
-    campaignRecord = await stopDurableReactivationCampaign({
-      store,
-      tenantId,
-      campaignId: command.campaignId,
-      reason: stopReason(experimentRecord.payload),
-      now
-    });
-  } else if (['COMPLETED', 'INCONCLUSIVE'].includes(experimentRecord.payload.state)) {
-    campaignRecord = await completeDurableReactivationCampaign({ store, tenantId, campaignId: command.campaignId, now });
-  } else {
-    throw new Error(`REACTIVATION_OBSERVATION_TERMINAL_EXPERIMENT_UNSUPPORTED:${experimentRecord.payload.state}`);
-  }
-
+  const finished = await finishCampaignFromTerminalExperiment({ store, tenantId, campaignRecord, experimentRecord, now });
+  campaignRecord = finished.record;
   return {
-    schemaVersion: 1,
-    tenantId,
-    commandId,
+    schemaVersion: 1, tenantId, commandId,
     campaignId: campaignRecord.recordId,
     experimentId: experimentRecord.recordId,
     experimentState: experimentRecord.payload.state,
@@ -147,6 +135,7 @@ export async function evaluateReactivationObservationAndCloseCampaign({
     campaignState: campaignRecord.payload.status,
     closed: true,
     idempotent: false,
+    campaignTransitioned: finished.transitioned,
     evidenceRefs: [...experimentRecord.payload.closeEvidenceRefs]
   };
 }
