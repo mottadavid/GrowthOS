@@ -4,6 +4,7 @@ import {
   validateCapacitySourceAuthority,
   evaluateCapacitySourceAuthority,
   deriveCapacityStateWithAuthority,
+  capacitySourceAuthorityHash,
   CAPACITY_AUTHORITY_DECISIONS
 } from '../core/capacity-source-authority.mjs';
 import { mutateAuthoritativeRuntimeState } from './atomic-store.mjs';
@@ -120,4 +121,55 @@ export function assertCapacityBundleUsableForDemand(record, { now = new Date() }
   if (decision.decision !== CAPACITY_AUTHORITY_DECISIONS.READY) throw new Error(`DURABLE_CAPACITY_AUTHORITY_NOT_READY:${decision.reasons.join(',')}`);
   if (derived.status !== 'AVAILABLE' || derived.demandThrottleRecommended === true) throw new Error(`DURABLE_CAPACITY_NOT_AVAILABLE:${derived.status}`);
   return { authorityDecision: decision, derived };
+}
+
+export function capacityExecutionProofHash(proof) {
+  if (!proof || typeof proof !== 'object' || Array.isArray(proof)) throw new Error('capacity proof must be an object.');
+  const { proofHash, ...body } = proof;
+  return sha256Canonical(body);
+}
+
+export function buildCapacityExecutionProof(record, { now = new Date() } = {}) {
+  validateBundleRecord(record, record.tenantId);
+  const usable = assertCapacityBundleUsableForDemand(record, { now });
+  const { evidence, authority, semanticHash } = record.payload;
+  const proof = {
+    schemaVersion: 1,
+    tenantId: record.tenantId,
+    capacityBundleId: record.recordId,
+    capacitySemanticHash: semanticHash,
+    evidenceId: evidence.evidenceId,
+    authorityId: authority.authorityId,
+    authorityHash: capacitySourceAuthorityHash(authority),
+    sourceSystem: evidence.sourceSystem,
+    sourceAuthority: evidence.sourceAuthority,
+    scopeKey: evidence.scopeKey,
+    asOf: evidence.asOf,
+    validUntil: evidence.validUntil,
+    derivedStatus: usable.derived.status,
+    demandThrottleRecommended: usable.derived.demandThrottleRecommended,
+    authorityDecision: usable.authorityDecision.decision
+  };
+  return { ...proof, proofHash: sha256Canonical(proof) };
+}
+
+export function validateCapacityExecutionProof(proof, { tenantId = null, now = new Date() } = {}) {
+  if (!proof || typeof proof !== 'object' || Array.isArray(proof)) throw new Error('capacity proof must be an object.');
+  if (proof.schemaVersion !== 1) throw new Error('Unsupported capacity proof schemaVersion.');
+  for (const field of ['tenantId','capacityBundleId','capacitySemanticHash','evidenceId','authorityId','authorityHash','sourceSystem','sourceAuthority','scopeKey','asOf','validUntil','derivedStatus','authorityDecision','proofHash']) {
+    requiredString(proof[field], `capacityProof.${field}`);
+  }
+  for (const field of ['capacitySemanticHash','authorityHash','proofHash']) {
+    if (!/^[0-9a-f]{64}$/.test(proof[field])) throw new Error(`capacityProof.${field} must be SHA-256 hex.`);
+  }
+  if (capacityExecutionProofHash(proof) !== proof.proofHash) throw new Error('CAPACITY_EXECUTION_PROOF_HASH_MISMATCH');
+  if (tenantId !== null && proof.tenantId !== tenantId) throw new Error('CAPACITY_EXECUTION_PROOF_TENANT_MISMATCH');
+  if (proof.derivedStatus !== 'AVAILABLE' || proof.demandThrottleRecommended !== false || proof.authorityDecision !== CAPACITY_AUTHORITY_DECISIONS.READY) {
+    throw new Error('CAPACITY_EXECUTION_PROOF_NOT_AVAILABLE');
+  }
+  const nowMs = now instanceof Date ? now.getTime() : Date.parse(now);
+  if (!Number.isFinite(nowMs)) throw new Error('now must be a valid date/time.');
+  if (!Number.isFinite(Date.parse(proof.asOf)) || !Number.isFinite(Date.parse(proof.validUntil))) throw new Error('capacity proof dates must be valid.');
+  if (nowMs > Date.parse(proof.validUntil)) throw new Error('CAPACITY_EXECUTION_PROOF_EXPIRED');
+  return proof;
 }
