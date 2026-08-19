@@ -6,9 +6,9 @@
   "contractName": "wiserr-growth-snapshot",
   "contractVersion": "1",
   "status": "CANDIDATE",
-  "validatedCommitSha": "5e7e24511b53dcf73d2f8cbe590549e5165046a6",
+  "validatedCommitSha": "c05ea558cbe677e326452ad51c3e24fd99ab9ff6",
   "authorityFingerprint": "5682a8ce6223466f7f391929d5957515fef34c918cacc52a202041324f2c1588",
-  "validatedAt": "2026-08-19T04:05:14.000Z",
+  "validatedAt": "2026-08-19T14:01:43.000Z",
   "validUntil": null,
   "guardedPaths": [
     "server/growth/growthSnapshotService.ts",
@@ -27,8 +27,13 @@
   "evidence": [
     {
       "kind": "GITHUB_PR",
-      "reference": "mottadavid/Wiserr-OS#1725",
-      "summary": "Fresh current-base draft producer/domain slice for aggregate GrowthOS planning state; not mounted as a certified read API."
+      "reference": "mottadavid/Wiserr-OS#1726",
+      "summary": "All seven required gates passed on the exact current-base producer head before merge. The aggregate producer is canonical on Wiserr main, but no authenticated GrowthOS read surface is mounted yet."
+    },
+    {
+      "kind": "GITHUB_COMMIT",
+      "reference": "mottadavid/Wiserr-OS@c05ea558cbe677e326452ad51c3e24fd99ab9ff6",
+      "summary": "Merged bounded aggregate GrowthOS snapshot producer."
     },
     {
       "kind": "AUTHORITY_AUDIT",
@@ -41,5 +46,5 @@
       "summary": "Wiserr remains the sole blessed outbound SMS authority; existing purposes do not certify GrowthOS marketing reactivation."
     }
   ],
-  "notes": "Candidate only. The current upstream slice defines the aggregate producer but has no mounted GrowthOS read surface. GrowthOS must not require readGrowthSnapshot or any execution capability from this receipt until the producer is merged, an authenticated read boundary is separately merged/tested, the mounted semantic basis is re-fingerprinted, and the dependency is promoted to CERTIFIED. Operational capacity remains external to this producer and must come from a separately authorized capacity source."
+  "notes": "Candidate only. The aggregate producer is merged on Wiserr main, but there is still no mounted authenticated GrowthOS read surface. GrowthOS must not require readGrowthSnapshot or any execution capability from this receipt until an authenticated read boundary is separately merged/tested, the mounted semantic basis is re-fingerprinted, and this dependency is promoted to CERTIFIED. Operational capacity remains external to this producer and must come from a separately authorized capacity source."
 }
