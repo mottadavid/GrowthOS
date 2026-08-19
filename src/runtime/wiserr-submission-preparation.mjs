@@ -1,4 +1,6 @@
 import { EXECUTION_ATTEMPT_STATES } from '../core/execution-attempts.mjs';
+import { validateCapacityExecutionProof } from '../core/capacity-execution-proof.mjs';
+import { assertWiserrReactivationSmsExecutionAuthorityReady } from '../integrations/wiserr/reactivation-sms-authority.mjs';
 import { assertExecutionRuntime } from './bootstrap.mjs';
 import { loadDurableExecutionAttempt, markDurableExecutionSubmitting } from './execution-attempt-repository.mjs';
 import { loadDurableReactivationCampaign, startDurableReactivationCampaignFromPersistedCommand } from './reactivation-campaign-repository.mjs';
@@ -17,6 +19,27 @@ function assertCommandAttemptIdentity(command, attempt) {
   }
 }
 
+function assertCurrentAuthoritiesMatchCommand(command, capacityProof, executionAuthorityDecision, { tenantId, now }) {
+  validateCapacityExecutionProof(capacityProof, { tenantId, now });
+  if (
+    capacityProof.capacityBundleId !== command.capacityBundleId ||
+    capacityProof.proofHash !== command.capacityProofHash ||
+    capacityProof.capacitySemanticHash !== command.capacitySemanticHash ||
+    capacityProof.authorityHash !== command.capacityAuthorityHash
+  ) {
+    throw new Error('WISERR_SUBMISSION_CAPACITY_AUTHORITY_CHANGED');
+  }
+
+  assertWiserrReactivationSmsExecutionAuthorityReady(executionAuthorityDecision);
+  const currentLock = requiredString(
+    executionAuthorityDecision.metadata?.lockFingerprint,
+    'executionAuthorityDecision.metadata.lockFingerprint'
+  );
+  if (currentLock !== command.executionAuthorityLockFingerprint) {
+    throw new Error('WISERR_SUBMISSION_SMS_AUTHORITY_CHANGED');
+  }
+}
+
 function assertExecutingCampaignMatchesCommand(campaign, command) {
   if (campaign.tenantId !== command.tenantId || campaign.campaignId !== command.campaignId) throw new Error('WISERR_SUBMISSION_COMMAND_CAMPAIGN_MISMATCH');
   if (campaign.status !== 'EXECUTING') throw new Error('WISERR_SUBMISSION_CAMPAIGN_NOT_EXECUTING');
@@ -26,7 +49,15 @@ function assertExecutingCampaignMatchesCommand(campaign, command) {
   }
 }
 
-export async function preparePersistedWiserrReactivationSubmission({ runtime, tenantId, campaignId, commandId, now = new Date() }) {
+export async function preparePersistedWiserrReactivationSubmission({
+  runtime,
+  tenantId,
+  campaignId,
+  commandId,
+  capacityProof,
+  executionAuthorityDecision,
+  now = new Date()
+}) {
   requiredString(tenantId, 'tenantId');
   requiredString(campaignId, 'campaignId');
   requiredString(commandId, 'commandId');
@@ -37,6 +68,10 @@ export async function preparePersistedWiserrReactivationSubmission({ runtime, te
   if (!commandRecord) throw new Error('WISERR_SUBMISSION_COMMAND_NOT_FOUND');
   const command = clone(commandRecord.payload.command);
   if (command.campaignId !== campaignId) throw new Error('WISERR_SUBMISSION_COMMAND_CAMPAIGN_MISMATCH');
+
+  // Historical command authority is not enough. Revalidate the exact capacity
+  // and channel authority again at the instant of submission, before mutation.
+  assertCurrentAuthoritiesMatchCommand(command, capacityProof, executionAuthorityDecision, { tenantId, now });
 
   let campaignRecord = await loadDurableReactivationCampaign({ store, tenantId, campaignId });
   if (!campaignRecord) throw new Error('WISERR_SUBMISSION_CAMPAIGN_NOT_FOUND');
