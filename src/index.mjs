@@ -45,6 +45,7 @@ export {
   evaluateCapacitySourceAuthority,
   deriveCapacityStateWithAuthority
 } from './core/capacity-source-authority.mjs';
+export { capacityExecutionProofHash, validateCapacityExecutionProof } from './core/capacity-execution-proof.mjs';
 export {
   approvalBoundEnvelope,
   envelopeAuthorityHash,
@@ -88,183 +89,76 @@ export {
   validateGrowthRunManifest,
   assertGrowthRunManifestMatches
 } from './core/growth-run.mjs';
-export {
-  runtimePayloadHash,
-  validateRuntimeRecord,
-  validateRuntimeEvent,
-  InMemoryRuntimeStore
-} from './runtime/store.mjs';
+export { runtimePayloadHash, validateRuntimeRecord, validateRuntimeEvent, InMemoryRuntimeStore } from './runtime/store.mjs';
 export { PostgresRuntimeStore } from './runtime/postgres-store.mjs';
+export { AtomicInMemoryRuntimeStore, AtomicPostgresRuntimeStore, mutateAuthoritativeRuntimeState } from './runtime/atomic-store.mjs';
+export { createPgPoolTransactionRunner, createAtomicPostgresRuntimeStoreFromPool } from './runtime/postgres-transaction-adapter.mjs';
+export { defaultMigrationDirectory, discoverRuntimeMigrations, runRuntimeMigrations } from './runtime/migrations.mjs';
+export { evaluateRuntimeDatabaseEvidence, inspectRuntimeDatabase, assertRuntimeDatabaseReady } from './runtime/database-certification.mjs';
+export { evaluateStartupReadiness, inspectTenantStartupReadiness, assertTenantStartupReady } from './runtime/startup-readiness.mjs';
+export { RUNTIME_MODES, bootstrapTenantRuntime, assertExecutionRuntime } from './runtime/bootstrap.mjs';
 export {
-  AtomicInMemoryRuntimeStore,
-  AtomicPostgresRuntimeStore,
-  mutateAuthoritativeRuntimeState
-} from './runtime/atomic-store.mjs';
-export {
-  createPgPoolTransactionRunner,
-  createAtomicPostgresRuntimeStoreFromPool
-} from './runtime/postgres-transaction-adapter.mjs';
-export {
-  defaultMigrationDirectory,
-  discoverRuntimeMigrations,
-  runRuntimeMigrations
-} from './runtime/migrations.mjs';
-export {
-  evaluateRuntimeDatabaseEvidence,
-  inspectRuntimeDatabase,
-  assertRuntimeDatabaseReady
-} from './runtime/database-certification.mjs';
-export {
-  evaluateStartupReadiness,
-  inspectTenantStartupReadiness,
-  assertTenantStartupReady
-} from './runtime/startup-readiness.mjs';
-export {
-  RUNTIME_MODES,
-  bootstrapTenantRuntime,
-  assertExecutionRuntime
-} from './runtime/bootstrap.mjs';
-export {
-  EXECUTION_ATTEMPT_RECORD_TYPE,
-  loadDurableExecutionAttempt,
-  listDurableExecutionAttempts,
-  createDurableExecutionAttempt,
-  markDurableExecutionSubmitting,
-  markDurableExecutionAccepted,
-  markDurableExecutionCompleted,
-  markDurableExecutionDefinitiveFailure,
-  markDurableExecutionNotAccepted,
-  markDurableExecutionReconciliationRequired,
-  reconcileDurableExecutionAttempt
+  EXECUTION_ATTEMPT_RECORD_TYPE, loadDurableExecutionAttempt, listDurableExecutionAttempts,
+  createDurableExecutionAttempt, markDurableExecutionSubmitting, markDurableExecutionAccepted,
+  markDurableExecutionCompleted, markDurableExecutionDefinitiveFailure, markDurableExecutionNotAccepted,
+  markDurableExecutionReconciliationRequired, reconcileDurableExecutionAttempt
 } from './runtime/execution-attempt-repository.mjs';
 export {
-  REACTIVATION_CAMPAIGN_RECORD_TYPE,
-  durableCampaignIdForPlan,
-  loadDurableReactivationCampaign,
-  listDurableReactivationCampaigns,
-  createDurableReactivationCampaign,
-  submitDurableReactivationCampaignForApproval,
-  approveDurableReactivationCampaign,
-  startDurableReactivationCampaignFromCommand,
-  markDurableReactivationCampaignObserving,
-  markDurableReactivationCampaignReconciliationRequired,
-  stopDurableReactivationCampaign,
-  failDurableReactivationCampaign,
-  completeDurableReactivationCampaign
+  REACTIVATION_CAMPAIGN_RECORD_TYPE, durableCampaignIdForPlan, loadDurableReactivationCampaign,
+  listDurableReactivationCampaigns, createDurableReactivationCampaign,
+  submitDurableReactivationCampaignForApproval, approveDurableReactivationCampaign,
+  startDurableReactivationCampaignFromCommand, markDurableReactivationCampaignObserving,
+  markDurableReactivationCampaignReconciliationRequired, stopDurableReactivationCampaign,
+  failDurableReactivationCampaign, completeDurableReactivationCampaign
 } from './runtime/reactivation-campaign-repository.mjs';
 export {
-  ACTION_ENVELOPE_RECORD_TYPE,
-  actionEnvelopeRecoveryIndex,
-  loadDurableActionEnvelope,
-  listDurableActionEnvelopes,
-  createDurableDraftEnvelope,
-  activateDurableActionEnvelope,
-  revokeDurableActionEnvelope,
-  expireDurableActionEnvelope,
-  replaceDurableActionEnvelope
+  ACTION_ENVELOPE_RECORD_TYPE, actionEnvelopeRecoveryIndex, loadDurableActionEnvelope,
+  listDurableActionEnvelopes, createDurableDraftEnvelope, activateDurableActionEnvelope,
+  revokeDurableActionEnvelope, expireDurableActionEnvelope, replaceDurableActionEnvelope
 } from './runtime/action-envelope-repository.mjs';
 export {
-  EXPERIMENT_RECORD_TYPE,
-  loadDurableExperiment,
-  listDurableExperiments,
-  createDurableExperiment,
-  approveDurableExperiment,
-  startDurableExperiment,
-  markDurableExperimentObserving,
-  evaluateDurableExperiment,
-  evaluateAndCloseDurableExperiment,
-  markDurableExperimentReconciliationRequired
+  EXPERIMENT_RECORD_TYPE, loadDurableExperiment, listDurableExperiments, createDurableExperiment,
+  approveDurableExperiment, startDurableExperiment, markDurableExperimentObserving,
+  evaluateDurableExperiment, evaluateAndCloseDurableExperiment, markDurableExperimentReconciliationRequired
 } from './runtime/experiment-repository.mjs';
 export {
-  POLICY_AUTHORIZATION_RECORD_TYPE,
-  loadDurablePolicyAuthorization,
-  listDurablePolicyAuthorizations,
-  evaluateAndPersistPolicyAuthorization,
-  assertDurablePolicyAuthorizationMatches
+  POLICY_AUTHORIZATION_RECORD_TYPE, loadDurablePolicyAuthorization, listDurablePolicyAuthorizations,
+  evaluateAndPersistPolicyAuthorization, assertDurablePolicyAuthorizationMatches
 } from './runtime/policy-authorization-repository.mjs';
+export { BUSINESS_OUTCOME_RECORD_TYPE, durableBusinessOutcomeId, loadDurableBusinessOutcome, listDurableBusinessOutcomes, ingestDurableBusinessOutcome } from './runtime/business-outcome-repository.mjs';
+export { WISERR_GROWTH_SNAPSHOT_RECORD_TYPE, loadDurableWiserrGrowthSnapshot, listDurableWiserrGrowthSnapshots, readAndPersistWiserrGrowthSnapshot } from './runtime/wiserr-snapshot-repository.mjs';
 export {
-  BUSINESS_OUTCOME_RECORD_TYPE,
-  durableBusinessOutcomeId,
-  loadDurableBusinessOutcome,
-  listDurableBusinessOutcomes,
-  ingestDurableBusinessOutcome
-} from './runtime/business-outcome-repository.mjs';
-export {
-  WISERR_GROWTH_SNAPSHOT_RECORD_TYPE,
-  loadDurableWiserrGrowthSnapshot,
-  listDurableWiserrGrowthSnapshots,
-  readAndPersistWiserrGrowthSnapshot
-} from './runtime/wiserr-snapshot-repository.mjs';
-export {
-  CAPACITY_BUNDLE_RECORD_TYPE,
-  capacityBundleId,
-  capacityBundleRecoveryIndex,
-  loadDurableCapacityBundle,
-  listDurableCapacityBundles,
-  evaluateAndPersistCapacityBundle,
-  assertCapacityBundleUsableForDemand
+  CAPACITY_BUNDLE_RECORD_TYPE, capacityBundleId, capacityBundleRecoveryIndex, loadDurableCapacityBundle,
+  listDurableCapacityBundles, evaluateAndPersistCapacityBundle, assertCapacityBundleUsableForDemand,
+  buildCapacityExecutionProof
 } from './runtime/capacity-bundle-repository.mjs';
 export {
-  REACTIVATION_OPPORTUNITY_RECORD_TYPE,
-  durableReactivationOpportunityEvaluationId,
-  loadDurableReactivationOpportunityEvaluation,
-  listDurableReactivationOpportunityEvaluations,
+  REACTIVATION_OPPORTUNITY_RECORD_TYPE, durableReactivationOpportunityEvaluationId,
+  loadDurableReactivationOpportunityEvaluation, listDurableReactivationOpportunityEvaluations,
   evaluateAndPersistDurableReactivationOpportunity
 } from './runtime/reactivation-opportunity-repository.mjs';
-export {
-  GROWTH_RUN_MANIFEST_RECORD_TYPE,
-  loadDurableGrowthRunManifest,
-  listDurableGrowthRunManifests,
-  buildAndPersistDurableGrowthRunManifest
-} from './runtime/growth-run-repository.mjs';
+export { GROWTH_RUN_MANIFEST_RECORD_TYPE, loadDurableGrowthRunManifest, listDurableGrowthRunManifests, buildAndPersistDurableGrowthRunManifest } from './runtime/growth-run-repository.mjs';
 export { buildTenantRecoveryReport } from './runtime/recovery-report.mjs';
-export {
-  GROWTHOS_EXECUTION_MODES,
-  resolveGrowthOsExecutionConfig,
-  resolveGrowthOsDatabaseConfig
-} from './runtime/config.mjs';
+export { GROWTHOS_EXECUTION_MODES, resolveGrowthOsExecutionConfig, resolveGrowthOsDatabaseConfig } from './runtime/config.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
-export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
+export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelEligibility, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
+export { evaluateWiserrGrowthSnapshotReadAuthority, validateGrowthSnapshotFreshness, readWiserrGrowthSnapshot } from './integrations/wiserr/read-client.mjs';
+export { validateWiserrGrowthSnapshotAuthorityBasis, wiserrGrowthSnapshotAuthorityFingerprint, currentWiserrGrowthSnapshotProducerBasis } from './integrations/wiserr/growth-snapshot-authority.mjs';
 export {
-  evaluateWiserrGrowthSnapshotReadAuthority,
-  validateGrowthSnapshotFreshness,
-  readWiserrGrowthSnapshot
-} from './integrations/wiserr/read-client.mjs';
-export {
-  validateWiserrGrowthSnapshotAuthorityBasis,
-  wiserrGrowthSnapshotAuthorityFingerprint,
-  currentWiserrGrowthSnapshotProducerBasis
-} from './integrations/wiserr/growth-snapshot-authority.mjs';
-export {
-  WISERR_REACTIVATION_SMS_DEPENDENCY_ID,
-  WISERR_REACTIVATION_SMS_CONTRACT_NAME,
-  WISERR_REACTIVATION_SMS_CAPABILITY,
-  validateWiserrReactivationSmsAuthorityBasis,
-  wiserrReactivationSmsAuthorityFingerprint,
-  currentWiserrReactivationSmsObservedBasis,
-  evaluateWiserrReactivationSmsExecutionAuthority,
-  isWiserrReactivationSmsExecutionAuthorityReady,
+  WISERR_REACTIVATION_SMS_DEPENDENCY_ID, WISERR_REACTIVATION_SMS_CONTRACT_NAME,
+  WISERR_REACTIVATION_SMS_CAPABILITY, validateWiserrReactivationSmsAuthorityBasis,
+  wiserrReactivationSmsAuthorityFingerprint, currentWiserrReactivationSmsObservedBasis,
+  evaluateWiserrReactivationSmsExecutionAuthority, isWiserrReactivationSmsExecutionAuthorityReady,
   assertWiserrReactivationSmsExecutionAuthorityReady
 } from './integrations/wiserr/reactivation-sms-authority.mjs';
 export { approvalBoundReactivationPlan, reactivationPlanApprovalHash, buildReactivationPlan, assertApprovedReactivationPlan, buildWiserrReactivationExecutionRequest } from './reactivation/plan.mjs';
 export { buildReactivationPolicyAction } from './reactivation/action.mjs';
+export { REACTIVATION_PREFLIGHT_DECISIONS, evaluateReactivationExecutionPrerequisites } from './reactivation/execution-preflight.mjs';
 export {
-  REACTIVATION_CAMPAIGN_STATES,
-  CAMPAIGN_START_DECISIONS,
-  createReactivationCampaign,
-  submitReactivationCampaignForApproval,
-  approveReactivationCampaign,
-  assertCampaignPlanIntegrity,
-  evaluateReactivationCampaignStart,
-  startReactivationCampaign,
-  markReactivationCampaignObserving,
-  markReactivationCampaignReconciliationRequired,
-  stopReactivationCampaign,
-  failReactivationCampaign,
+  REACTIVATION_CAMPAIGN_STATES, CAMPAIGN_START_DECISIONS, createReactivationCampaign,
+  submitReactivationCampaignForApproval, approveReactivationCampaign, assertCampaignPlanIntegrity,
+  evaluateReactivationCampaignStart, startReactivationCampaign, markReactivationCampaignObserving,
+  markReactivationCampaignReconciliationRequired, stopReactivationCampaign, failReactivationCampaign,
   completeReactivationCampaign
 } from './reactivation/campaign.mjs';
-export {
-  wiserrReactivationCommandHash,
-  buildWiserrReactivationCommand,
-  validateWiserrReactivationCommand
-} from './reactivation/wiserr-command.mjs';
+export { wiserrReactivationCommandHash, buildWiserrReactivationCommand, validateWiserrReactivationCommand } from './reactivation/wiserr-command.mjs';

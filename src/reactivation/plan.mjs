@@ -1,5 +1,5 @@
 import { sha256Canonical } from '../core/canonical.mjs';
-import { channelReadiness, validateWiserrGrowthSnapshot } from '../integrations/wiserr/growth-snapshot.mjs';
+import { channelEligibility, validateWiserrGrowthSnapshot } from '../integrations/wiserr/growth-snapshot.mjs';
 
 function requiredString(value, label) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a non-empty string.`);
@@ -51,9 +51,8 @@ export function buildReactivationPlan({
   if (opportunity.tenantId !== snapshot.tenantId) throw new Error('Opportunity tenant does not match snapshot tenant.');
   if (opportunity.businessSnapshotId !== snapshot.snapshotId) throw new Error('Opportunity snapshot does not match current Wiserr snapshot.');
 
-  const readiness = channelReadiness(snapshot, channel);
-  if (!readiness.capabilityEnabled) throw new Error(`Wiserr capability ${readiness.capability} is not enabled.`);
-  if (readiness.eligibleRecipients < 1) throw new Error(`No currently eligible ${channel} recipients exist for this cohort.`);
+  const eligibility = channelEligibility(snapshot, channel);
+  if (eligibility.eligibleRecipients < 1) throw new Error(`No currently eligible ${channel} recipients exist for this cohort.`);
 
   if (!message || typeof message !== 'object') throw new Error('message is required.');
   requiredString(message.strategy, 'message.strategy');
@@ -68,7 +67,7 @@ export function buildReactivationPlan({
   }
   if (!['QUALIFIED_REPLY', 'BOOKING', 'WON_CUSTOMER'].includes(successMetric)) throw new Error('Invalid successMetric.');
 
-  const plannedMaxRecipients = Math.min(requestedMaxRecipients, readiness.eligibleRecipients);
+  const plannedMaxRecipients = Math.min(requestedMaxRecipients, eligibility.eligibleRecipients);
   const planId = `plan-${opportunity.opportunityId}-${channel}`;
   const plan = {
     schemaVersion: 1,
@@ -99,7 +98,7 @@ export function buildReactivationPlan({
     },
     execution: {
       authority: 'WISERR',
-      requiresCapability: readiness.capability,
+      requiresCapability: eligibility.capability,
       attemptNumber: 1
     }
   };

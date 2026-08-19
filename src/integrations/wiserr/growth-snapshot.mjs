@@ -74,17 +74,24 @@ const CHANNEL_CAPABILITY = Object.freeze({
   whatsapp: 'reactivationWhatsapp'
 });
 
-export function channelReadiness(snapshot, channel) {
+export function channelEligibility(snapshot, channel) {
   validateWiserrGrowthSnapshot(snapshot);
   const capability = CHANNEL_CAPABILITY[channel];
   if (!capability) throw new Error(`Unsupported reactivation channel: ${channel}`);
-  const eligible = snapshot.reactivation.eligibleByChannel[channel] ?? 0;
   return {
     channel,
     capability,
-    capabilityEnabled: snapshot.capabilities[capability] === true,
-    eligibleRecipients: eligible,
-    ready: snapshot.capabilities[capability] === true && eligible > 0
+    eligibleRecipients: snapshot.reactivation.eligibleByChannel[channel] ?? 0
+  };
+}
+
+export function channelReadiness(snapshot, channel) {
+  const eligibility = channelEligibility(snapshot, channel);
+  const capabilityEnabled = snapshot.capabilities[eligibility.capability] === true;
+  return {
+    ...eligibility,
+    capabilityEnabled,
+    ready: capabilityEnabled && eligibility.eligibleRecipients > 0
   };
 }
 

@@ -4,6 +4,7 @@ import {
   validateCapacitySourceAuthority,
   evaluateCapacitySourceAuthority,
   deriveCapacityStateWithAuthority,
+  capacitySourceAuthorityHash,
   CAPACITY_AUTHORITY_DECISIONS
 } from '../core/capacity-source-authority.mjs';
 import { mutateAuthoritativeRuntimeState } from './atomic-store.mjs';
@@ -120,4 +121,28 @@ export function assertCapacityBundleUsableForDemand(record, { now = new Date() }
   if (decision.decision !== CAPACITY_AUTHORITY_DECISIONS.READY) throw new Error(`DURABLE_CAPACITY_AUTHORITY_NOT_READY:${decision.reasons.join(',')}`);
   if (derived.status !== 'AVAILABLE' || derived.demandThrottleRecommended === true) throw new Error(`DURABLE_CAPACITY_NOT_AVAILABLE:${derived.status}`);
   return { authorityDecision: decision, derived };
+}
+
+export function buildCapacityExecutionProof(record, { now = new Date() } = {}) {
+  validateBundleRecord(record, record.tenantId);
+  const usable = assertCapacityBundleUsableForDemand(record, { now });
+  const { evidence, authority, semanticHash } = record.payload;
+  const proof = {
+    schemaVersion: 1,
+    tenantId: record.tenantId,
+    capacityBundleId: record.recordId,
+    capacitySemanticHash: semanticHash,
+    evidenceId: evidence.evidenceId,
+    authorityId: authority.authorityId,
+    authorityHash: capacitySourceAuthorityHash(authority),
+    sourceSystem: evidence.sourceSystem,
+    sourceAuthority: evidence.sourceAuthority,
+    scopeKey: evidence.scopeKey,
+    asOf: evidence.asOf,
+    validUntil: evidence.validUntil,
+    derivedStatus: usable.derived.status,
+    demandThrottleRecommended: usable.derived.demandThrottleRecommended,
+    authorityDecision: usable.authorityDecision.decision
+  };
+  return { ...proof, proofHash: sha256Canonical(proof) };
 }
