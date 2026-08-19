@@ -37,18 +37,20 @@ export {
 } from './runtime/wiserr-reactivation-command-repository.mjs';
 export { preparePersistedWiserrReactivationSubmission } from './runtime/wiserr-submission-preparation.mjs';
 export {
-  WISERR_SUBMISSION_RESULT_RECORD_TYPE,
-  WISERR_SUBMISSION_OUTCOMES,
-  validateWiserrSubmissionResult,
-  wiserrSubmissionResultSemanticHash,
-  loadDurableWiserrSubmissionResult,
-  listDurableWiserrSubmissionResults,
-  persistDurableWiserrSubmissionResult,
-  ingestWiserrReactivationSubmissionResult
+  WISERR_SUBMISSION_RESULT_RECORD_TYPE, WISERR_SUBMISSION_OUTCOMES,
+  validateWiserrSubmissionResult, wiserrSubmissionResultSemanticHash,
+  loadDurableWiserrSubmissionResult, listDurableWiserrSubmissionResults,
+  persistDurableWiserrSubmissionResult, ingestWiserrReactivationSubmissionResult
 } from './runtime/wiserr-submission-result-ingestion.mjs';
 export { ingestWiserrReactivationSubmissionResultAndAdvanceCampaign } from './runtime/wiserr-submission-campaign-coordinator.mjs';
 export { reconcileWiserrReactivationSubmissionAndCampaign } from './runtime/wiserr-submission-reconciliation-coordinator.mjs';
 export { evaluateReactivationObservationAndCloseCampaign } from './runtime/reactivation-observation-close-coordinator.mjs';
+export {
+  EXECUTION_ECONOMICS_RECORD_TYPE, ECONOMICS_CERTAINTY, ECONOMICS_KINDS,
+  executionEconomicsSemanticBody, executionEconomicsSemanticHash,
+  loadDurableExecutionEconomicsEvent, ingestDurableExecutionEconomicsEvent,
+  listDurableExecutionEconomicsEvents, summarizeExecutionEconomics
+} from './runtime/execution-economics-repository.mjs';
 export {
   REACTIVATION_CAMPAIGN_RECORD_TYPE, durableCampaignIdForPlan, loadDurableReactivationCampaign,
   listDurableReactivationCampaigns, createDurableReactivationCampaign,
