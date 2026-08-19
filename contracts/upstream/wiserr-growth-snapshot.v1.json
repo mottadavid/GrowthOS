@@ -6,9 +6,9 @@
   "contractName": "wiserr-growth-snapshot",
   "contractVersion": "1",
   "status": "CANDIDATE",
-  "validatedCommitSha": "43c2b6d55634c0fddb1251df0236d531a96bab07",
+  "validatedCommitSha": "5e7e24511b53dcf73d2f8cbe590549e5165046a6",
   "authorityFingerprint": "5682a8ce6223466f7f391929d5957515fef34c918cacc52a202041324f2c1588",
-  "validatedAt": "2026-08-19T02:13:25.000Z",
+  "validatedAt": "2026-08-19T04:05:14.000Z",
   "validUntil": null,
   "guardedPaths": [
     "server/growth/growthSnapshotService.ts",
@@ -27,7 +27,7 @@
   "evidence": [
     {
       "kind": "GITHUB_PR",
-      "reference": "mottadavid/Wiserr-OS#1708",
+      "reference": "mottadavid/Wiserr-OS#1725",
       "summary": "Fresh current-base draft producer/domain slice for aggregate GrowthOS planning state; not mounted as a certified read API."
     },
     {
