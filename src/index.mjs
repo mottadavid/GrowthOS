@@ -110,6 +110,11 @@ export {
   runRuntimeMigrations
 } from './runtime/migrations.mjs';
 export {
+  evaluateRuntimeDatabaseEvidence,
+  inspectRuntimeDatabase,
+  assertRuntimeDatabaseReady
+} from './runtime/database-certification.mjs';
+export {
   EXECUTION_ATTEMPT_RECORD_TYPE,
   loadDurableExecutionAttempt,
   listDurableExecutionAttempts,
