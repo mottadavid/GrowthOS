@@ -193,8 +193,7 @@ test('self-consistent forged command still cannot change approved campaign seman
     { name: 'cohort', change: command => ({ ...command, cohortDefinitionVersion: 'v2' }), error: /COHORT_MISMATCH/ },
     { name: 'channel', change: command => ({ ...command, channel: 'email' }), error: /CHANNEL_MISMATCH/ },
     { name: 'snapshot', change: command => ({ ...command, originalBusinessSnapshotId: 'other-snapshot' }), error: /SNAPSHOT_MISMATCH/ },
-    { name: 'recipients', change: command => ({ ...command, maxRecipients: 500 }), error: /RECIPIENT_CEILING_INVALID/ },
-    { name: 'execution authority', change: command => ({ ...command, executionAuthorityDependencyId: 'wiserr-growth-snapshot-v1' }), error: /EXECUTION_AUTHORITY_MISMATCH/ }
+    { name: 'recipients', change: command => ({ ...command, maxRecipients: 500 }), error: /RECIPIENT_CEILING_INVALID/ }
   ];
 
   for (const item of cases) {
@@ -212,6 +211,22 @@ test('self-consistent forged command still cannot change approved campaign seman
     const unchanged = await loadDurableReactivationCampaign({ store, tenantId: 'tenant-1', campaignId: record.recordId });
     assert.equal(unchanged.payload.status, 'APPROVED');
   }
+});
+
+test('self-consistent command cannot substitute a different execution authority dependency', async () => {
+  const store = new AtomicInMemoryRuntimeStore();
+  const { record } = await approvedDurableCampaign(store);
+  const changedBody = commandFor(record);
+  delete changedBody.commandHash;
+  changedBody.executionAuthorityDependencyId = 'wiserr-growth-snapshot-v1';
+  const forged = { ...changedBody, commandHash: sha256Canonical(changedBody) };
+  assert.equal(wiserrReactivationCommandHash(forged), forged.commandHash);
+  assert.throws(
+    () => startDurableReactivationCampaignFromCommand({
+      store, tenantId: 'tenant-1', campaignId: record.recordId, command: forged, now: new Date('2026-08-18T20:03:00Z')
+    }),
+    /WISERR_REACTIVATION_COMMAND_EXECUTION_AUTHORITY_MISMATCH/
+  );
 });
 
 test('durable campaign survives executing to observing to completed lifecycle', async () => {
