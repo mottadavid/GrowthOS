@@ -1,7 +1,8 @@
 import { reactivationPlanApprovalHash } from './plan.mjs';
-import { channelEligibility, validateWiserrGrowthSnapshot } from '../integrations/wiserr/growth-snapshot.mjs';
-import { validateCapacityExecutionProof } from '../core/capacity-execution-proof.mjs';
-import { isWiserrReactivationSmsExecutionAuthorityReady } from '../integrations/wiserr/reactivation-sms-authority.mjs';
+import {
+  evaluateReactivationExecutionPrerequisites,
+  REACTIVATION_PREFLIGHT_DECISIONS
+} from './execution-preflight.mjs';
 
 export const REACTIVATION_CAMPAIGN_STATES = Object.freeze([
   'DRAFT',
@@ -139,33 +140,15 @@ export function evaluateReactivationCampaignStart({
     return { decision: CAMPAIGN_START_DECISIONS.REQUIRE_REAPPROVAL, reasons: ['CAMPAIGN_APPROVAL_EXPIRED'] };
   }
 
-  if (!isWiserrReactivationSmsExecutionAuthorityReady(executionAuthorityDecision)) {
-    return {
-      decision: CAMPAIGN_START_DECISIONS.DENY,
-      reasons: [
-        'WISERR_REACTIVATION_SMS_EXECUTION_AUTHORITY_NOT_READY',
-        ...(executionAuthorityDecision?.reasons || [])
-      ]
-    };
-  }
-
-  validateWiserrGrowthSnapshot(currentSnapshot);
-  if (currentSnapshot.tenantId !== campaign.tenantId) {
-    return { decision: CAMPAIGN_START_DECISIONS.DENY, reasons: ['CURRENT_SNAPSHOT_TENANT_MISMATCH'] };
-  }
-  if (['STALE', 'UNAVAILABLE'].includes(currentSnapshot.completeness)) {
-    return { decision: CAMPAIGN_START_DECISIONS.NO_ACTION, reasons: ['CURRENT_BUSINESS_STATE_NOT_FRESH_ENOUGH'] };
-  }
-
-  try {
-    validateCapacityExecutionProof(capacityProof, { tenantId: campaign.tenantId, now });
-  } catch (error) {
-    const noAction = ['CAPACITY_EXECUTION_PROOF_NOT_AVAILABLE','CAPACITY_EXECUTION_PROOF_EXPIRED','CAPACITY_EXECUTION_PROOF_NOT_YET_VALID'].includes(error.message);
-    return {
-      decision: noAction ? CAMPAIGN_START_DECISIONS.NO_ACTION : CAMPAIGN_START_DECISIONS.DENY,
-      reasons: [error.message === 'capacity proof must be an object.' ? 'CAPACITY_EXECUTION_PROOF_REQUIRED' : error.message]
-    };
-  }
+  const preflight = evaluateReactivationExecutionPrerequisites({
+    tenantId: campaign.tenantId,
+    currentSnapshot,
+    channel: campaign.plan.channel,
+    capacityProof,
+    executionAuthorityDecision,
+    now
+  });
+  if (preflight.decision !== REACTIVATION_PREFLIGHT_DECISIONS.READY) return preflight;
 
   if (
     currentSnapshot.reactivation.cohortDefinitionId !== campaign.plan.cohort.definitionId ||
@@ -174,23 +157,18 @@ export function evaluateReactivationCampaignStart({
     return { decision: CAMPAIGN_START_DECISIONS.REQUIRE_REAPPROVAL, reasons: ['COHORT_DEFINITION_CHANGED'] };
   }
 
-  const eligibility = channelEligibility(currentSnapshot, campaign.plan.channel);
-  if (eligibility.eligibleRecipients < 1) {
-    return { decision: CAMPAIGN_START_DECISIONS.NO_ACTION, reasons: ['NO_CURRENTLY_ELIGIBLE_RECIPIENTS'] };
-  }
-
   return {
     decision: CAMPAIGN_START_DECISIONS.READY,
     reasons: ['CAMPAIGN_REVALIDATED_FOR_EXECUTION'],
-    dispatchMaxRecipients: Math.min(campaign.plan.cohort.plannedMaxRecipients, eligibility.eligibleRecipients),
-    currentSnapshotId: currentSnapshot.snapshotId,
-    currentEligibleRecipients: eligibility.eligibleRecipients,
-    capacityBundleId: capacityProof.capacityBundleId,
-    capacityProofHash: capacityProof.proofHash,
-    capacitySemanticHash: capacityProof.capacitySemanticHash,
-    capacityAuthorityHash: capacityProof.authorityHash,
-    executionAuthorityDependencyId: executionAuthorityDecision.metadata.dependencyId,
-    executionAuthorityLockFingerprint: executionAuthorityDecision.metadata.lockFingerprint ?? null
+    dispatchMaxRecipients: Math.min(campaign.plan.cohort.plannedMaxRecipients, preflight.currentEligibleRecipients),
+    currentSnapshotId: preflight.currentSnapshotId,
+    currentEligibleRecipients: preflight.currentEligibleRecipients,
+    capacityBundleId: preflight.capacityBundleId,
+    capacityProofHash: preflight.capacityProofHash,
+    capacitySemanticHash: preflight.capacitySemanticHash,
+    capacityAuthorityHash: preflight.capacityAuthorityHash,
+    executionAuthorityDependencyId: preflight.executionAuthorityDependencyId,
+    executionAuthorityLockFingerprint: preflight.executionAuthorityLockFingerprint
   };
 }
 
@@ -218,7 +196,7 @@ export function markReactivationCampaignObserving(campaign, { now = new Date() }
   };
 }
 
-export function markReactivationCampaignReconciliationRequired(campaign, { reason, now = new Date() }) {
+export function markReactivationCampaignReconciliationRequired(campaign, { reason, now = new Date() } = {}) {
   assertState(campaign, ['EXECUTING'], 'mark reconciliation required');
   requiredString(reason, 'reason');
   return {
