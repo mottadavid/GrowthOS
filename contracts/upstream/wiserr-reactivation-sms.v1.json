@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "dependencyId": "wiserr-reactivation-sms-v1",
+  "system": "WISERR_OS",
+  "repository": "mottadavid/Wiserr-OS",
+  "contractName": "wiserr-reactivation-sms",
+  "contractVersion": "1",
+  "status": "OBSERVED",
+  "validatedCommitSha": "76fbac41e6d7d2080e4fd54e4a64ce12d32ba5e5",
+  "authorityFingerprint": "40f333cfe7e0847652f5184386d82520ad40d1739aabd3656b0f23f1d7fbd1e9",
+  "validatedAt": "2026-08-19T02:53:00.000Z",
+  "validUntil": null,
+  "guardedPaths": [
+    "server/messaging/sendTenantSms.ts",
+    "server/services/smsComplianceService.ts",
+    "server/config/smsPlatformConfig.ts",
+    "docs/build-os/adr/0002-reuse-existing-sms-runtime.md"
+  ],
+  "capabilities": {
+    "reactivationSmsExecution": false
+  },
+  "evidence": [
+    {
+      "kind": "AUTHORITY_AUDIT",
+      "reference": "server/messaging/sendTenantSms.ts",
+      "summary": "Canonical SMS path has kill switch, opt-out fail-closed suppression, tenant compliance gate, shared-campaign purpose guard, rate limiting, provider orchestration, and ambiguity/manual-resolution handling. No explicit GrowthOS reactivation purpose exists."
+    },
+    {
+      "kind": "AUTHORITY_AUDIT",
+      "reference": "server/services/smsComplianceService.ts",
+      "summary": "Tenant SMS program and linked-number authority exist, but current data does not by itself prove the registered campaign/use case, sample messages, and opt-in evidence cover dormant-lead marketing reactivation."
+    },
+    {
+      "kind": "AUTHORITY_AUDIT",
+      "reference": "docs/build-os/adr/0002-reuse-existing-sms-runtime.md",
+      "summary": "Wiserr doctrine requires new product SMS purposes to receive compliance review and shared-campaign allowlist review before use."
+    }
+  ],
+  "notes": "Observed only. SMS transport availability, an active LOW_VOLUME_MIXED campaign, or the existing follow_up/luna_sms purposes must not be treated as GrowthOS marketing authority. Certification requires an explicit growth_reactivation purpose, approved compliance review, shared-campaign allowlist approval, verified carrier/use-case/sample/opt-in coverage, and retained canonical send/reconciliation safeguards."
+}

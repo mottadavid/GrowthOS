@@ -4,6 +4,10 @@ import { EXECUTION_ATTEMPT_STATES } from '../core/execution-attempts.mjs';
 import { assertExperimentIntegrity } from '../core/experiments.mjs';
 import { evaluateReactivationCampaignStart, CAMPAIGN_START_DECISIONS } from './campaign.mjs';
 import { reactivationPlanApprovalHash } from './plan.mjs';
+import {
+  WISERR_REACTIVATION_SMS_DEPENDENCY_ID,
+  assertWiserrReactivationSmsExecutionAuthorityReady
+} from '../integrations/wiserr/reactivation-sms-authority.mjs';
 
 function requiredString(value, label) {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${label} must be a non-empty string.`);
@@ -27,7 +31,7 @@ export function buildWiserrReactivationCommand({
   policyReceipt,
   attempt,
   currentSnapshot,
-  upstreamDecision,
+  executionAuthorityDecision,
   now = new Date()
 }) {
   if (!campaign || typeof campaign !== 'object') throw new Error('campaign is required.');
@@ -68,6 +72,8 @@ export function buildWiserrReactivationCommand({
   assertPolicyReceiptMatches({ receipt: policyReceipt, action, envelope });
   if (policyReceipt.decision !== 'ALLOW') throw new Error('REACTIVATION_POLICY_NOT_ALLOWED');
 
+  assertWiserrReactivationSmsExecutionAuthorityReady(executionAuthorityDecision);
+
   const actionHash = actionApprovalHash(action);
   if (attempt.state !== EXECUTION_ATTEMPT_STATES.CREATED) throw new Error('REACTIVATION_ATTEMPT_NOT_CREATED');
   if (attempt.tenantId !== action.tenantId || attempt.actionId !== action.actionId || attempt.actionHash !== actionHash) {
@@ -75,7 +81,7 @@ export function buildWiserrReactivationCommand({
   }
   if (attempt.attemptNumber !== action.attemptNumber) throw new Error('REACTIVATION_ATTEMPT_NUMBER_MISMATCH');
 
-  const start = evaluateReactivationCampaignStart({ campaign, currentSnapshot, upstreamDecision, now });
+  const start = evaluateReactivationCampaignStart({ campaign, currentSnapshot, executionAuthorityDecision, now });
   if (start.decision !== CAMPAIGN_START_DECISIONS.READY) {
     const error = new Error(`REACTIVATION_NOT_READY_FOR_WISERR:${start.decision}:${start.reasons.join(',')}`);
     error.startDecision = start;
@@ -108,6 +114,11 @@ export function buildWiserrReactivationCommand({
     attemptId: attempt.attemptId,
     attemptNumber: attempt.attemptNumber,
     idempotencyKey: attempt.idempotencyKey,
+    executionAuthorityDependencyId: WISERR_REACTIVATION_SMS_DEPENDENCY_ID,
+    executionAuthorityLockFingerprint: requiredString(
+      executionAuthorityDecision.metadata?.lockFingerprint,
+      'executionAuthorityDecision.metadata.lockFingerprint'
+    ),
     originalBusinessSnapshotId: plan.businessSnapshotId,
     executionBusinessSnapshotId: requiredString(start.currentSnapshotId, 'start.currentSnapshotId'),
     cohortDefinitionId: plan.cohort.definitionId,
@@ -132,15 +143,21 @@ export function validateWiserrReactivationCommand(command) {
   for (const field of [
     'commandId', 'tenantId', 'actionId', 'actionHash', 'campaignId', 'opportunityId', 'experimentId',
     'planId', 'planApprovalHash', 'campaignApprovalId', 'policyReceiptId', 'policyReceiptHash',
-    'envelopeId', 'envelopeHash', 'attemptId', 'idempotencyKey', 'originalBusinessSnapshotId',
-    'executionBusinessSnapshotId', 'cohortDefinitionId', 'cohortDefinitionVersion', 'channel',
-    'accountId', 'geography', 'commandHash'
+    'envelopeId', 'envelopeHash', 'attemptId', 'idempotencyKey', 'executionAuthorityDependencyId',
+    'executionAuthorityLockFingerprint', 'originalBusinessSnapshotId', 'executionBusinessSnapshotId',
+    'cohortDefinitionId', 'cohortDefinitionVersion', 'channel', 'accountId', 'geography', 'commandHash'
   ]) requiredString(command[field], `command.${field}`);
+  if (command.executionAuthorityDependencyId !== WISERR_REACTIVATION_SMS_DEPENDENCY_ID) {
+    throw new Error('WISERR_REACTIVATION_COMMAND_EXECUTION_AUTHORITY_MISMATCH');
+  }
   if (!Number.isInteger(command.attemptNumber) || command.attemptNumber < 1) throw new Error('command.attemptNumber must be positive.');
   if (!Number.isInteger(command.maxRecipients) || command.maxRecipients < 1) throw new Error('command.maxRecipients must be positive.');
   if (!command.message || typeof command.message !== 'object') throw new Error('command.message is required.');
   if (!command.frequencyPolicy || typeof command.frequencyPolicy !== 'object') throw new Error('command.frequencyPolicy is required.');
-  for (const field of ['actionHash', 'planApprovalHash', 'policyReceiptHash', 'envelopeHash', 'commandHash']) {
+  for (const field of [
+    'actionHash', 'planApprovalHash', 'policyReceiptHash', 'envelopeHash',
+    'executionAuthorityLockFingerprint', 'commandHash'
+  ]) {
     if (!/^[0-9a-f]{64}$/.test(command[field])) throw new Error(`command.${field} must be SHA-256 hex.`);
   }
   if (wiserrReactivationCommandHash(command) !== command.commandHash) throw new Error('WISERR_REACTIVATION_COMMAND_HASH_MISMATCH');

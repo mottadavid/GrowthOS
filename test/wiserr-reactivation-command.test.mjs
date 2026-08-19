@@ -8,6 +8,7 @@ import { createExecutionAttempt, markExecutionSubmitting } from '../src/core/exe
 import { createExperiment, approveExperiment } from '../src/core/experiments.mjs';
 import { evaluateDormantLeadReactivation } from '../src/opportunities/reactivation.mjs';
 import { toGrowthBusinessState } from '../src/integrations/wiserr/growth-snapshot.mjs';
+import { WISERR_REACTIVATION_SMS_DEPENDENCY_ID } from '../src/integrations/wiserr/reactivation-sms-authority.mjs';
 import { buildReactivationPlan } from '../src/reactivation/plan.mjs';
 import { buildReactivationPolicyAction } from '../src/reactivation/action.mjs';
 import { createReactivationCampaign, submitReactivationCampaignForApproval, approveReactivationCampaign } from '../src/reactivation/campaign.mjs';
@@ -81,6 +82,17 @@ function delegation() {
     canRevokeEnvelopes: true,
     evidenceRef: 'wiserr://authority/owner-1',
     notes: ''
+  };
+}
+
+function smsExecutionReady() {
+  return {
+    decision: 'READY',
+    reasons: ['UPSTREAM_AUTHORITY_CERTIFIED'],
+    metadata: {
+      dependencyId: WISERR_REACTIVATION_SMS_DEPENDENCY_ID,
+      lockFingerprint: 'c'.repeat(64)
+    }
   };
 }
 
@@ -186,11 +198,11 @@ function buildContext({ currentSnapshot = null } = {}) {
     envelope,
     policyReceipt,
     attempt,
-    upstreamDecision: { decision: 'READY', reasons: ['UPSTREAM_AUTHORITY_CERTIFIED'] }
+    executionAuthorityDecision: smsExecutionReady()
   };
 }
 
-test('command uses current execution-time recipient ceiling rather than stale approved maximum', () => {
+test('command uses current execution-time recipient ceiling and binds exact SMS execution authority', () => {
   const ctx = buildContext({
     currentSnapshot: snapshot({
       snapshotId: 'snapshot-current',
@@ -203,7 +215,22 @@ test('command uses current execution-time recipient ceiling rather than stale ap
   assert.equal(command.executionBusinessSnapshotId, 'snapshot-current');
   assert.equal(command.originalBusinessSnapshotId, 'snapshot-original');
   assert.equal(command.idempotencyKey, ctx.attempt.idempotencyKey);
+  assert.equal(command.executionAuthorityDependencyId, WISERR_REACTIVATION_SMS_DEPENDENCY_ID);
+  assert.equal(command.executionAuthorityLockFingerprint, ctx.executionAuthorityDecision.metadata.lockFingerprint);
   assert.equal(validateWiserrReactivationCommand(command), command);
+});
+
+test('READY snapshot-read authority cannot substitute for SMS execution authority', () => {
+  const ctx = buildContext();
+  const readAuthority = {
+    decision: 'READY',
+    reasons: ['UPSTREAM_AUTHORITY_CERTIFIED'],
+    metadata: { dependencyId: 'wiserr-growth-snapshot-v1', lockFingerprint: 'd'.repeat(64) }
+  };
+  assert.throws(
+    () => buildWiserrReactivationCommand({ ...ctx, executionAuthorityDecision: readAuthority, now: NOW }),
+    /WISERR_REACTIVATION_SMS_EXECUTION_AUTHORITY_NOT_READY/
+  );
 });
 
 test('current execution state can stop the handoff after approval', () => {
@@ -259,10 +286,13 @@ test('post-approval message mutation cannot cross into the Wiserr command', () =
   );
 });
 
-test('command hash detects mutation after handoff construction', () => {
+test('command hash detects authority or recipient mutation after handoff construction', () => {
   const ctx = buildContext();
   const command = buildWiserrReactivationCommand({ ...ctx, now: NOW });
-  const changed = structuredClone(command);
-  changed.maxRecipients -= 1;
-  assert.throws(() => validateWiserrReactivationCommand(changed), /WISERR_REACTIVATION_COMMAND_HASH_MISMATCH/);
+  for (const changed of [
+    { ...structuredClone(command), maxRecipients: command.maxRecipients - 1 },
+    { ...structuredClone(command), executionAuthorityLockFingerprint: 'e'.repeat(64) }
+  ]) {
+    assert.throws(() => validateWiserrReactivationCommand(changed), /WISERR_REACTIVATION_COMMAND_HASH_MISMATCH/);
+  }
 });

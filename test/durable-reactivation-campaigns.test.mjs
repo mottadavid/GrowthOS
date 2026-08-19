@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sha256Canonical } from '../src/core/canonical.mjs';
+import { WISERR_REACTIVATION_SMS_DEPENDENCY_ID } from '../src/integrations/wiserr/reactivation-sms-authority.mjs';
 import { AtomicInMemoryRuntimeStore } from '../src/runtime/atomic-store.mjs';
 import { buildReactivationPlan } from '../src/reactivation/plan.mjs';
 import { wiserrReactivationCommandHash } from '../src/reactivation/wiserr-command.mjs';
@@ -107,6 +108,8 @@ function commandFor(campaignRecord, overrides = {}) {
     attemptId: 'attempt-1',
     attemptNumber: 1,
     idempotencyKey: 'growthos:tenant-1:action-1:hash:attempt:1',
+    executionAuthorityDependencyId: WISERR_REACTIVATION_SMS_DEPENDENCY_ID,
+    executionAuthorityLockFingerprint: 'd'.repeat(64),
     originalBusinessSnapshotId: p.businessSnapshotId,
     executionBusinessSnapshotId: 'snapshot-execution-1',
     cohortDefinitionId: p.cohort.definitionId,
@@ -200,7 +203,7 @@ test('self-consistent forged command still cannot change approved campaign seman
     const changedBody = item.change(base);
     delete changedBody.commandHash;
     const forged = { ...changedBody, commandHash: sha256Canonical(changedBody) };
-    assert.equal(wiserrReactivationCommandHash(forged), forged.commandHash, `${item.name} command should be internally valid`);
+    assert.equal(wiserrReactivationCommandHash(forged), forged.commandHash, `${item.name} command should be internally hash-valid`);
     await assert.rejects(
       () => startDurableReactivationCampaignFromCommand({ store, tenantId: 'tenant-1', campaignId: record.recordId, command: forged, now: new Date('2026-08-18T20:03:00Z') }),
       item.error
@@ -208,6 +211,22 @@ test('self-consistent forged command still cannot change approved campaign seman
     const unchanged = await loadDurableReactivationCampaign({ store, tenantId: 'tenant-1', campaignId: record.recordId });
     assert.equal(unchanged.payload.status, 'APPROVED');
   }
+});
+
+test('self-consistent command cannot substitute a different execution authority dependency', async () => {
+  const store = new AtomicInMemoryRuntimeStore();
+  const { record } = await approvedDurableCampaign(store);
+  const changedBody = commandFor(record);
+  delete changedBody.commandHash;
+  changedBody.executionAuthorityDependencyId = 'wiserr-growth-snapshot-v1';
+  const forged = { ...changedBody, commandHash: sha256Canonical(changedBody) };
+  assert.equal(wiserrReactivationCommandHash(forged), forged.commandHash);
+  assert.throws(
+    () => startDurableReactivationCampaignFromCommand({
+      store, tenantId: 'tenant-1', campaignId: record.recordId, command: forged, now: new Date('2026-08-18T20:03:00Z')
+    }),
+    /WISERR_REACTIVATION_COMMAND_EXECUTION_AUTHORITY_MISMATCH/
+  );
 });
 
 test('durable campaign survives executing to observing to completed lifecycle', async () => {

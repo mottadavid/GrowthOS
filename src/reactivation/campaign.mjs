@@ -1,6 +1,6 @@
 import { reactivationPlanApprovalHash } from './plan.mjs';
 import { channelReadiness, validateWiserrGrowthSnapshot } from '../integrations/wiserr/growth-snapshot.mjs';
-import { UPSTREAM_AUTHORITY_DECISIONS } from '../core/upstream-authority.mjs';
+import { isWiserrReactivationSmsExecutionAuthorityReady } from '../integrations/wiserr/reactivation-sms-authority.mjs';
 
 export const REACTIVATION_CAMPAIGN_STATES = Object.freeze([
   'DRAFT',
@@ -119,7 +119,7 @@ export function assertCampaignPlanIntegrity(campaign) {
 export function evaluateReactivationCampaignStart({
   campaign,
   currentSnapshot,
-  upstreamDecision,
+  executionAuthorityDecision,
   now = new Date()
 }) {
   if (campaign.status !== 'APPROVED') {
@@ -137,10 +137,13 @@ export function evaluateReactivationCampaignStart({
     return { decision: CAMPAIGN_START_DECISIONS.REQUIRE_REAPPROVAL, reasons: ['CAMPAIGN_APPROVAL_EXPIRED'] };
   }
 
-  if (!upstreamDecision || upstreamDecision.decision !== UPSTREAM_AUTHORITY_DECISIONS.READY) {
+  if (!isWiserrReactivationSmsExecutionAuthorityReady(executionAuthorityDecision)) {
     return {
       decision: CAMPAIGN_START_DECISIONS.DENY,
-      reasons: ['UPSTREAM_AUTHORITY_NOT_READY', ...(upstreamDecision?.reasons || [])]
+      reasons: [
+        'WISERR_REACTIVATION_SMS_EXECUTION_AUTHORITY_NOT_READY',
+        ...(executionAuthorityDecision?.reasons || [])
+      ]
     };
   }
 
@@ -178,7 +181,9 @@ export function evaluateReactivationCampaignStart({
     reasons: ['CAMPAIGN_REVALIDATED_FOR_EXECUTION'],
     dispatchMaxRecipients: Math.min(campaign.plan.cohort.plannedMaxRecipients, readiness.eligibleRecipients),
     currentSnapshotId: currentSnapshot.snapshotId,
-    currentEligibleRecipients: readiness.eligibleRecipients
+    currentEligibleRecipients: readiness.eligibleRecipients,
+    executionAuthorityDependencyId: executionAuthorityDecision.metadata.dependencyId,
+    executionAuthorityLockFingerprint: executionAuthorityDecision.metadata.lockFingerprint ?? null
   };
 }
 

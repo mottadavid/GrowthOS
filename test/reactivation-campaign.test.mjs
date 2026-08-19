@@ -15,6 +15,7 @@ import {
   submitReactivationCampaignForApproval
 } from '../src/reactivation/campaign.mjs';
 import { UPSTREAM_AUTHORITY_DECISIONS } from '../src/core/upstream-authority.mjs';
+import { WISERR_REACTIVATION_SMS_DEPENDENCY_ID } from '../src/integrations/wiserr/reactivation-sms-authority.mjs';
 
 const NOW = new Date('2026-08-18T20:00:00.000Z');
 
@@ -75,38 +76,63 @@ function approvedCampaign({ expiresAt = null } = {}) {
   });
 }
 
-const upstreamReady = {
+const executionReady = {
   decision: UPSTREAM_AUTHORITY_DECISIONS.READY,
-  reasons: ['UPSTREAM_AUTHORITY_CERTIFIED']
+  reasons: ['UPSTREAM_AUTHORITY_CERTIFIED'],
+  metadata: {
+    dependencyId: WISERR_REACTIVATION_SMS_DEPENDENCY_ID,
+    lockFingerprint: 'a'.repeat(64)
+  }
 };
 
 test('campaign preserves exact approved plan and becomes execution-ready only after approval', () => {
   const campaign = approvedCampaign();
   assert.equal(campaign.status, 'APPROVED');
   assert.equal(assertCampaignPlanIntegrity(campaign), true);
-  const result = evaluateReactivationCampaignStart({ campaign, currentSnapshot: snapshot(), upstreamDecision: upstreamReady, now: NOW });
+  const result = evaluateReactivationCampaignStart({ campaign, currentSnapshot: snapshot(), executionAuthorityDecision: executionReady, now: NOW });
   assert.equal(result.decision, CAMPAIGN_START_DECISIONS.READY);
   assert.equal(result.dispatchMaxRecipients, 50);
+  assert.equal(result.executionAuthorityDependencyId, WISERR_REACTIVATION_SMS_DEPENDENCY_ID);
 });
 
 test('post-approval plan mutation requires reapproval', () => {
   const campaign = approvedCampaign();
   campaign.plan.message.body = 'Changed after approval';
-  const result = evaluateReactivationCampaignStart({ campaign, currentSnapshot: snapshot(), upstreamDecision: upstreamReady, now: NOW });
+  const result = evaluateReactivationCampaignStart({ campaign, currentSnapshot: snapshot(), executionAuthorityDecision: executionReady, now: NOW });
   assert.equal(result.decision, CAMPAIGN_START_DECISIONS.REQUIRE_REAPPROVAL);
   assert.ok(result.reasons.includes('APPROVED_CAMPAIGN_PLAN_CHANGED'));
 });
 
-test('candidate or otherwise unready upstream authority denies execution', () => {
+test('candidate or otherwise unready SMS execution authority denies execution', () => {
   const campaign = approvedCampaign();
   const result = evaluateReactivationCampaignStart({
     campaign,
     currentSnapshot: snapshot(),
-    upstreamDecision: { decision: UPSTREAM_AUTHORITY_DECISIONS.REVIEW_REQUIRED, reasons: ['UPSTREAM_AUTHORITY_CANDIDATE'] },
+    executionAuthorityDecision: {
+      decision: UPSTREAM_AUTHORITY_DECISIONS.REVIEW_REQUIRED,
+      reasons: ['UPSTREAM_AUTHORITY_CANDIDATE'],
+      metadata: { dependencyId: WISERR_REACTIVATION_SMS_DEPENDENCY_ID }
+    },
     now: NOW
   });
   assert.equal(result.decision, CAMPAIGN_START_DECISIONS.DENY);
-  assert.ok(result.reasons.includes('UPSTREAM_AUTHORITY_NOT_READY'));
+  assert.ok(result.reasons.includes('WISERR_REACTIVATION_SMS_EXECUTION_AUTHORITY_NOT_READY'));
+});
+
+test('READY decision from the snapshot-read dependency cannot authorize SMS execution', () => {
+  const campaign = approvedCampaign();
+  const result = evaluateReactivationCampaignStart({
+    campaign,
+    currentSnapshot: snapshot(),
+    executionAuthorityDecision: {
+      decision: UPSTREAM_AUTHORITY_DECISIONS.READY,
+      reasons: ['UPSTREAM_AUTHORITY_CERTIFIED'],
+      metadata: { dependencyId: 'wiserr-growth-snapshot-v1', lockFingerprint: 'b'.repeat(64) }
+    },
+    now: NOW
+  });
+  assert.equal(result.decision, CAMPAIGN_START_DECISIONS.DENY);
+  assert.ok(result.reasons.includes('WISERR_REACTIVATION_SMS_EXECUTION_AUTHORITY_NOT_READY'));
 });
 
 test('execution-time capacity change produces NO_ACTION', () => {
@@ -115,7 +141,7 @@ test('execution-time capacity change produces NO_ACTION', () => {
     const result = evaluateReactivationCampaignStart({
       campaign,
       currentSnapshot: snapshot({ capacity: { status, demandThrottleRecommended: true } }),
-      upstreamDecision: upstreamReady,
+      executionAuthorityDecision: executionReady,
       now: NOW
     });
     assert.equal(result.decision, CAMPAIGN_START_DECISIONS.NO_ACTION);
@@ -135,7 +161,7 @@ test('cohort definition drift requires reapproval rather than silently changing 
         eligibleByChannel: { sms: 80, email: 60, whatsapp: 0 }
       }
     }),
-    upstreamDecision: upstreamReady,
+    executionAuthorityDecision: executionReady,
     now: NOW
   });
   assert.equal(result.decision, CAMPAIGN_START_DECISIONS.REQUIRE_REAPPROVAL);
@@ -149,7 +175,7 @@ test('current capability revocation denies and zero eligible recipients chooses 
     currentSnapshot: snapshot({
       capabilities: { reactivationSms: false, reactivationEmail: true, reactivationWhatsapp: false, lunaReplyHandling: false, bookingOutcomes: false }
     }),
-    upstreamDecision: upstreamReady,
+    executionAuthorityDecision: executionReady,
     now: NOW
   });
   assert.equal(disabled.decision, CAMPAIGN_START_DECISIONS.DENY);
@@ -165,7 +191,7 @@ test('current capability revocation denies and zero eligible recipients chooses 
         eligibleByChannel: { sms: 0, email: 0, whatsapp: 0 }
       }
     }),
-    upstreamDecision: upstreamReady,
+    executionAuthorityDecision: executionReady,
     now: NOW
   });
   assert.equal(empty.decision, CAMPAIGN_START_DECISIONS.NO_ACTION);
@@ -184,7 +210,7 @@ test('fewer currently eligible recipients lowers dispatch count without exceedin
         eligibleByChannel: { sms: 25, email: 20, whatsapp: 0 }
       }
     }),
-    upstreamDecision: upstreamReady,
+    executionAuthorityDecision: executionReady,
     now: NOW
   });
   assert.equal(result.decision, CAMPAIGN_START_DECISIONS.READY);
@@ -196,7 +222,7 @@ test('expired campaign approval requires reapproval', () => {
   const result = evaluateReactivationCampaignStart({
     campaign,
     currentSnapshot: snapshot(),
-    upstreamDecision: upstreamReady,
+    executionAuthorityDecision: executionReady,
     now: new Date('2026-08-18T21:00:00.000Z')
   });
   assert.equal(result.decision, CAMPAIGN_START_DECISIONS.REQUIRE_REAPPROVAL);
