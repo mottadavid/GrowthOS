@@ -125,38 +125,15 @@ export function evaluateReactivationCampaignStart({
   executionAuthorityDecision,
   now = new Date()
 }) {
-  if (campaign.status !== 'APPROVED') {
-    return { decision: CAMPAIGN_START_DECISIONS.DENY, reasons: ['CAMPAIGN_NOT_APPROVED'] };
-  }
-
-  try {
-    assertCampaignPlanIntegrity(campaign);
-  } catch (error) {
-    return { decision: CAMPAIGN_START_DECISIONS.REQUIRE_REAPPROVAL, reasons: [error.message] };
-  }
-
+  if (campaign.status !== 'APPROVED') return { decision: CAMPAIGN_START_DECISIONS.DENY, reasons: ['CAMPAIGN_NOT_APPROVED'] };
+  try { assertCampaignPlanIntegrity(campaign); } catch (error) { return { decision: CAMPAIGN_START_DECISIONS.REQUIRE_REAPPROVAL, reasons: [error.message] }; }
   const nowIso = iso(now, 'now');
-  if (campaign.approval.expiresAt && Date.parse(nowIso) > Date.parse(campaign.approval.expiresAt)) {
-    return { decision: CAMPAIGN_START_DECISIONS.REQUIRE_REAPPROVAL, reasons: ['CAMPAIGN_APPROVAL_EXPIRED'] };
-  }
-
-  const preflight = evaluateReactivationExecutionPrerequisites({
-    tenantId: campaign.tenantId,
-    currentSnapshot,
-    channel: campaign.plan.channel,
-    capacityProof,
-    executionAuthorityDecision,
-    now
-  });
+  if (campaign.approval.expiresAt && Date.parse(nowIso) > Date.parse(campaign.approval.expiresAt)) return { decision: CAMPAIGN_START_DECISIONS.REQUIRE_REAPPROVAL, reasons: ['CAMPAIGN_APPROVAL_EXPIRED'] };
+  const preflight = evaluateReactivationExecutionPrerequisites({ tenantId: campaign.tenantId, currentSnapshot, channel: campaign.plan.channel, capacityProof, executionAuthorityDecision, now });
   if (preflight.decision !== REACTIVATION_PREFLIGHT_DECISIONS.READY) return preflight;
-
-  if (
-    currentSnapshot.reactivation.cohortDefinitionId !== campaign.plan.cohort.definitionId ||
-    currentSnapshot.reactivation.cohortDefinitionVersion !== campaign.plan.cohort.definitionVersion
-  ) {
+  if (currentSnapshot.reactivation.cohortDefinitionId !== campaign.plan.cohort.definitionId || currentSnapshot.reactivation.cohortDefinitionVersion !== campaign.plan.cohort.definitionVersion) {
     return { decision: CAMPAIGN_START_DECISIONS.REQUIRE_REAPPROVAL, reasons: ['COHORT_DEFINITION_CHANGED'] };
   }
-
   return {
     decision: CAMPAIGN_START_DECISIONS.READY,
     reasons: ['CAMPAIGN_REVALIDATED_FOR_EXECUTION'],
@@ -177,65 +154,47 @@ export function startReactivationCampaign(campaign, { attemptId, now = new Date(
   assertCampaignPlanIntegrity(campaign);
   requiredString(attemptId, 'attemptId');
   if (campaign.attemptIds.includes(attemptId)) throw new Error('DUPLICATE_CAMPAIGN_ATTEMPT_ID');
-  return {
-    ...clone(campaign),
-    status: 'EXECUTING',
-    attemptIds: [...campaign.attemptIds, attemptId],
-    updatedAt: iso(now, 'now')
-  };
+  return { ...clone(campaign), status: 'EXECUTING', attemptIds: [...campaign.attemptIds, attemptId], updatedAt: iso(now, 'now') };
 }
 
 export function markReactivationCampaignObserving(campaign, { now = new Date() } = {}) {
   assertState(campaign, ['EXECUTING'], 'mark observing');
   const timestamp = iso(now, 'now');
-  return {
-    ...clone(campaign),
-    status: 'OBSERVING',
-    observationStartedAt: timestamp,
-    updatedAt: timestamp
-  };
+  return { ...clone(campaign), status: 'OBSERVING', observationStartedAt: timestamp, updatedAt: timestamp };
 }
 
 export function markReactivationCampaignReconciliationRequired(campaign, { reason, now = new Date() } = {}) {
   assertState(campaign, ['EXECUTING'], 'mark reconciliation required');
   requiredString(reason, 'reason');
+  return { ...clone(campaign), status: 'RECONCILIATION_REQUIRED', failureReason: reason, updatedAt: iso(now, 'now') };
+}
+
+export function resolveReactivationCampaignReconciliationCompleted(campaign, { now = new Date() } = {}) {
+  assertState(campaign, ['RECONCILIATION_REQUIRED'], 'resolve reconciliation completed');
+  const timestamp = iso(now, 'now');
   return {
     ...clone(campaign),
-    status: 'RECONCILIATION_REQUIRED',
-    failureReason: reason,
-    updatedAt: iso(now, 'now')
+    status: 'OBSERVING',
+    observationStartedAt: timestamp,
+    failureReason: null,
+    updatedAt: timestamp
   };
 }
 
 export function stopReactivationCampaign(campaign, { reason, now = new Date() } = {}) {
   assertState(campaign, ['APPROVED', 'EXECUTING', 'OBSERVING', 'RECONCILIATION_REQUIRED'], 'stop');
   requiredString(reason, 'reason');
-  return {
-    ...clone(campaign),
-    status: 'STOPPED',
-    stopReason: reason,
-    updatedAt: iso(now, 'now')
-  };
+  return { ...clone(campaign), status: 'STOPPED', stopReason: reason, updatedAt: iso(now, 'now') };
 }
 
 export function failReactivationCampaign(campaign, { reason, now = new Date() } = {}) {
   assertState(campaign, ['EXECUTING', 'RECONCILIATION_REQUIRED'], 'fail');
   requiredString(reason, 'reason');
-  return {
-    ...clone(campaign),
-    status: 'FAILED',
-    failureReason: reason,
-    updatedAt: iso(now, 'now')
-  };
+  return { ...clone(campaign), status: 'FAILED', failureReason: reason, updatedAt: iso(now, 'now') };
 }
 
 export function completeReactivationCampaign(campaign, { now = new Date() } = {}) {
   assertState(campaign, ['OBSERVING'], 'complete');
   const timestamp = iso(now, 'now');
-  return {
-    ...clone(campaign),
-    status: 'COMPLETED',
-    completedAt: timestamp,
-    updatedAt: timestamp
-  };
+  return { ...clone(campaign), status: 'COMPLETED', completedAt: timestamp, updatedAt: timestamp };
 }
