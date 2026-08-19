@@ -48,6 +48,16 @@ export {
 } from './runtime/wiserr-submission-result-ingestion.mjs';
 export { ingestWiserrReactivationSubmissionResultAndAdvanceCampaign } from './runtime/wiserr-submission-campaign-coordinator.mjs';
 export {
+  EXECUTION_ECONOMICS_RECORD_TYPE,
+  EXECUTION_ECONOMICS_METRICS,
+  validateExecutionEconomicsObservation,
+  executionEconomicsSemanticHash,
+  loadDurableExecutionEconomics,
+  listDurableExecutionEconomics,
+  persistDurableExecutionEconomics,
+  summarizeDurableExecutionEconomics
+} from './runtime/execution-economics-repository.mjs';
+export {
   REACTIVATION_CAMPAIGN_RECORD_TYPE, durableCampaignIdForPlan, loadDurableReactivationCampaign,
   listDurableReactivationCampaigns, createDurableReactivationCampaign,
   submitDurableReactivationCampaignForApproval, approveDurableReactivationCampaign,
