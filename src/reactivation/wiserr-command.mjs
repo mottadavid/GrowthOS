@@ -2,6 +2,7 @@ import { actionApprovalHash, sha256Canonical } from '../core/canonical.mjs';
 import { assertPolicyReceiptMatches } from '../core/policy-receipts.mjs';
 import { EXECUTION_ATTEMPT_STATES } from '../core/execution-attempts.mjs';
 import { assertExperimentIntegrity } from '../core/experiments.mjs';
+import { validateCapacityExecutionProof } from '../core/capacity-execution-proof.mjs';
 import { evaluateReactivationCampaignStart, CAMPAIGN_START_DECISIONS } from './campaign.mjs';
 import { reactivationPlanApprovalHash } from './plan.mjs';
 import {
@@ -31,6 +32,7 @@ export function buildWiserrReactivationCommand({
   policyReceipt,
   attempt,
   currentSnapshot,
+  capacityProof,
   executionAuthorityDecision,
   now = new Date()
 }) {
@@ -73,6 +75,7 @@ export function buildWiserrReactivationCommand({
   if (policyReceipt.decision !== 'ALLOW') throw new Error('REACTIVATION_POLICY_NOT_ALLOWED');
 
   assertWiserrReactivationSmsExecutionAuthorityReady(executionAuthorityDecision);
+  validateCapacityExecutionProof(capacityProof, { tenantId: action.tenantId, now });
 
   const actionHash = actionApprovalHash(action);
   if (attempt.state !== EXECUTION_ATTEMPT_STATES.CREATED) throw new Error('REACTIVATION_ATTEMPT_NOT_CREATED');
@@ -81,7 +84,7 @@ export function buildWiserrReactivationCommand({
   }
   if (attempt.attemptNumber !== action.attemptNumber) throw new Error('REACTIVATION_ATTEMPT_NUMBER_MISMATCH');
 
-  const start = evaluateReactivationCampaignStart({ campaign, currentSnapshot, executionAuthorityDecision, now });
+  const start = evaluateReactivationCampaignStart({ campaign, currentSnapshot, capacityProof, executionAuthorityDecision, now });
   if (start.decision !== CAMPAIGN_START_DECISIONS.READY) {
     const error = new Error(`REACTIVATION_NOT_READY_FOR_WISERR:${start.decision}:${start.reasons.join(',')}`);
     error.startDecision = start;
@@ -114,6 +117,10 @@ export function buildWiserrReactivationCommand({
     attemptId: attempt.attemptId,
     attemptNumber: attempt.attemptNumber,
     idempotencyKey: attempt.idempotencyKey,
+    capacityBundleId: capacityProof.capacityBundleId,
+    capacityProofHash: capacityProof.proofHash,
+    capacitySemanticHash: capacityProof.capacitySemanticHash,
+    capacityAuthorityHash: capacityProof.authorityHash,
     executionAuthorityDependencyId: WISERR_REACTIVATION_SMS_DEPENDENCY_ID,
     executionAuthorityLockFingerprint: requiredString(
       executionAuthorityDecision.metadata?.lockFingerprint,
@@ -143,7 +150,8 @@ export function validateWiserrReactivationCommand(command) {
   for (const field of [
     'commandId', 'tenantId', 'actionId', 'actionHash', 'campaignId', 'opportunityId', 'experimentId',
     'planId', 'planApprovalHash', 'campaignApprovalId', 'policyReceiptId', 'policyReceiptHash',
-    'envelopeId', 'envelopeHash', 'attemptId', 'idempotencyKey', 'executionAuthorityDependencyId',
+    'envelopeId', 'envelopeHash', 'attemptId', 'idempotencyKey', 'capacityBundleId', 'capacityProofHash',
+    'capacitySemanticHash', 'capacityAuthorityHash', 'executionAuthorityDependencyId',
     'executionAuthorityLockFingerprint', 'originalBusinessSnapshotId', 'executionBusinessSnapshotId',
     'cohortDefinitionId', 'cohortDefinitionVersion', 'channel', 'accountId', 'geography', 'commandHash'
   ]) requiredString(command[field], `command.${field}`);
@@ -156,6 +164,7 @@ export function validateWiserrReactivationCommand(command) {
   if (!command.frequencyPolicy || typeof command.frequencyPolicy !== 'object') throw new Error('command.frequencyPolicy is required.');
   for (const field of [
     'actionHash', 'planApprovalHash', 'policyReceiptHash', 'envelopeHash',
+    'capacityProofHash', 'capacitySemanticHash', 'capacityAuthorityHash',
     'executionAuthorityLockFingerprint', 'commandHash'
   ]) {
     if (!/^[0-9a-f]{64}$/.test(command[field])) throw new Error(`command.${field} must be SHA-256 hex.`);
