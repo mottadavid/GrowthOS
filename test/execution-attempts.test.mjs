@@ -9,6 +9,7 @@ import {
   markExecutionAccepted,
   markExecutionCompleted,
   markExecutionDefinitiveFailure,
+  markExecutionSuppressed,
   markExecutionNotAccepted,
   markExecutionReconciliationRequired,
   markExecutionSubmitting,
@@ -45,13 +46,7 @@ test('creates deterministic idempotency identity bound to exact action hash', ()
   const first = createExecutionAttempt({ action: action(), attempts: [], maxAttempts: 1, now: new Date('2026-08-18T19:00:00Z') });
   assert.match(first.actionHash, /^[0-9a-f]{64}$/);
   assert.equal(first.idempotencyKey, `growthos:tenant-1:action-1:${first.actionHash}:attempt:1`);
-
-  const changed = createExecutionAttempt({
-    action: action({ inputs: { messageVersion: '2', cohortDefinition: 'dormant-90d' } }),
-    attempts: [],
-    maxAttempts: 1,
-    now: new Date('2026-08-18T19:00:00Z')
-  });
+  const changed = createExecutionAttempt({ action: action({ inputs: { messageVersion: '2', cohortDefinition: 'dormant-90d' } }), attempts: [], maxAttempts: 1, now: new Date('2026-08-18T19:00:00Z') });
   assert.notEqual(changed.actionHash, first.actionHash);
   assert.notEqual(changed.idempotencyKey, first.idempotencyKey);
 });
@@ -72,6 +67,25 @@ test('accepted execution can complete with external execution ID retained', () =
   assert.equal(attempt.state, EXECUTION_ATTEMPT_STATES.COMPLETED);
   assert.equal(attempt.externalExecutionId, 'provider-123');
   assert.deepEqual(attempt.result, { delivered: 97, suppressed: 3 });
+});
+
+test('suppression is terminal safety behavior and permanently forbids retry under the same action', () => {
+  const attempt = createExecutionAttempt({ action: action(), attempts: [], maxAttempts: 3 });
+  markExecutionSubmitting(attempt);
+  markExecutionSuppressed(attempt, { classification: 'RECIPIENT_OR_COMPLIANCE_SUPPRESSED', evidenceRef: 'wiserr://sms/result/1' });
+  assert.equal(attempt.state, EXECUTION_ATTEMPT_STATES.SUPPRESSED);
+  assert.equal(attempt.error, null);
+  assert.deepEqual(attempt.suppression, { classification: 'RECIPIENT_OR_COMPLIANCE_SUPPRESSED', evidenceRef: 'wiserr://sms/result/1' });
+  assert.equal(hasUnresolvedExecutionAttempt([attempt]), false);
+  assert.throws(() => assertExecutionAttemptAvailable([attempt], 3), /EXECUTION_SUPPRESSED_RETRY_FORBIDDEN/);
+  assert.throws(() => createExecutionAttempt({ action: action(), attempts: [attempt], maxAttempts: 3 }), /EXECUTION_SUPPRESSED_RETRY_FORBIDDEN/);
+});
+
+test('suppression can only be recorded from submitting and requires canonical classification', () => {
+  const attempt = createExecutionAttempt({ action: action(), attempts: [], maxAttempts: 1 });
+  assert.throws(() => markExecutionSuppressed(attempt, { classification: 'SUPPRESSED' }), /not allowed from CREATED/);
+  markExecutionSubmitting(attempt);
+  assert.throws(() => markExecutionSuppressed(attempt, { classification: '' }), /classification is required/);
 });
 
 test('definitive failure is distinct from ambiguous failure', () => {
@@ -101,16 +115,8 @@ test('reconciliation requires evidence and resolves ambiguity before another att
   markExecutionSubmitting(attempt);
   markExecutionAccepted(attempt, { externalExecutionId: 'provider-456' });
   markExecutionReconciliationRequired(attempt, new Error('result lookup failed'));
-
   assert.throws(() => reconcileExecutionAttempt(attempt, { outcome: 'COMPLETED', by: 'operator', evidence: '' }), /evidence is required/);
-
-  reconcileExecutionAttempt(attempt, {
-    outcome: 'COMPLETED',
-    by: 'operator',
-    evidence: 'Provider dashboard shows completed request provider-456',
-    result: { delivered: 100 }
-  });
-
+  reconcileExecutionAttempt(attempt, { outcome: 'COMPLETED', by: 'operator', evidence: 'Provider dashboard shows completed request provider-456', result: { delivered: 100 } });
   assert.equal(attempt.state, EXECUTION_ATTEMPT_STATES.RECONCILED_COMPLETED);
   assert.equal(hasUnresolvedExecutionAttempt([attempt]), false);
   assert.equal(assertExecutionAttemptAvailable([attempt], 2), true);
