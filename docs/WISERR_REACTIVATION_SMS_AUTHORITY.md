@@ -18,7 +18,7 @@ Wiserr already has a strong canonical SMS runtime:
 - provider orchestration propagates correlation/idempotency identity;
 - ambiguous provider outcomes stop fallback and require reconciliation.
 
-Those facts prove transport and safety infrastructure. They do **not** prove dormant-lead marketing authority.
+Those facts prove transport and safety infrastructure. They do **not** prove dormant-lead marketing authority, and they do not yet prove the canonical result contract GrowthOS now requires on the return path.
 
 ## Why execution remains disabled
 
@@ -27,6 +27,8 @@ The current Wiserr `SmsPurpose` vocabulary does not contain an explicit GrowthOS
 Wiserr's own SMS ADR says product-specific purposes may be added only after compliance review and shared-campaign allowlist review.
 
 The shared platform campaign is currently described as `LOW_VOLUME_MIXED`, but that label alone is insufficient evidence that the actual registered use case, sample messages, and opt-in evidence cover dormant-lead marketing reactivation.
+
+GrowthOS also now consumes a canonical submission-result contract. Wiserr must prove that the execution boundary returns a privacy-bounded canonical classification with a durable evidence reference, preserves suppression as suppression, and exposes a deterministic lookup/reconciliation path for ambiguous outcomes. Provider strings or transport exceptions are not an acceptable substitute.
 
 Therefore the checked-in upstream receipt is `OBSERVED` and:
 
@@ -54,6 +56,16 @@ The semantic basis cannot set `reactivationSmsExecution=true` unless all of thes
    - production no-simulation;
    - no direct provider bypass;
    - ambiguous outcomes require reconciliation.
+6. Execution identity remains stable:
+   - correlation identity is preserved;
+   - GrowthOS idempotency identity is propagated.
+7. The canonical return path is certified:
+   - submission results are classified canonically rather than inferred from provider strings;
+   - each result carries a durable evidence reference;
+   - compliance/opt-out/kill-switch refusals preserve canonical suppression classification;
+   - ambiguous outcomes have an explicit lookup/reconciliation contract.
+
+The current observed basis records the first two execution-identity properties as present and the four return-path properties as unproven. That observed basis remains valid for audit purposes but cannot become executable.
 
 ## Command binding
 
@@ -63,5 +75,7 @@ A Wiserr reactivation command records:
 - `executionAuthorityLockFingerprint`
 
 Both are inside the command hash. A READY decision from any other dependency, including the snapshot read dependency, is rejected.
+
+The authority fingerprint also binds the return-path certification fields. Adding or removing canonical result/reconciliation support changes the fingerprint and therefore invalidates any previously issued execution lock until re-certified.
 
 This prevents authority confusion as GrowthOS gains more upstream integrations.
