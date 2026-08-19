@@ -123,3 +123,28 @@ export function currentWiserrGrowthSnapshotProducerBasis() {
     }
   };
 }
+
+export function candidateWiserrGrowthSnapshotMountedBasis() {
+  const basis = currentWiserrGrowthSnapshotProducerBasis();
+  return {
+    ...basis,
+    guardedPaths: [
+      ...basis.guardedPaths,
+      'server/routes/growthSnapshotRoute.ts',
+      'server/routes/tenantProfileRoute.ts',
+      'server/index.ts',
+      'server/authMiddleware.ts',
+      'server/middleware/rejectTenantParam.ts',
+      'tests/growth/growthSnapshotRoute.test.ts'
+    ],
+    readSurface: {
+      mounted: true,
+      authAuthority: 'requireAuth -> setTenantFromToken -> rejectTenantParam -> owner/admin/super_admin',
+      routeOrService: 'GET /api/tenant/growth/snapshot?dormantDays=<1..3650>'
+    },
+    capabilities: {
+      ...basis.capabilities,
+      readGrowthSnapshot: true
+    }
+  };
+}
