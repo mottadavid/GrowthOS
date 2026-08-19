@@ -73,7 +73,12 @@ export { GROWTHOS_EXECUTION_MODES, resolveGrowthOsExecutionConfig, resolveGrowth
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelEligibility, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
 export { evaluateWiserrGrowthSnapshotReadAuthority, validateGrowthSnapshotFreshness, readWiserrGrowthSnapshot } from './integrations/wiserr/read-client.mjs';
-export { validateWiserrGrowthSnapshotAuthorityBasis, wiserrGrowthSnapshotAuthorityFingerprint, currentWiserrGrowthSnapshotProducerBasis } from './integrations/wiserr/growth-snapshot-authority.mjs';
+export { validateWiserrGrowthSnapshotAuthorityBasis, wiserrGrowthSnapshotAuthorityFingerprint, currentWiserrGrowthSnapshotProducerBasis, candidateWiserrGrowthSnapshotMountedBasis } from './integrations/wiserr/growth-snapshot-authority.mjs';
+export {
+  WISERR_GROWTH_SNAPSHOT_DEPENDENCY_ID, WISERR_GROWTH_SNAPSHOT_REQUIRED_GATES,
+  WISERR_GROWTH_SNAPSHOT_CERTIFICATION_DECISIONS, evaluateWiserrMountedSnapshotCertification,
+  buildCertifiedWiserrGrowthSnapshotReceipt
+} from './integrations/wiserr/growth-snapshot-certification.mjs';
 export { WISERR_REACTIVATION_SMS_DEPENDENCY_ID, WISERR_REACTIVATION_SMS_CONTRACT_NAME, WISERR_REACTIVATION_SMS_CAPABILITY, validateWiserrReactivationSmsAuthorityBasis, wiserrReactivationSmsAuthorityFingerprint, currentWiserrReactivationSmsObservedBasis, evaluateWiserrReactivationSmsExecutionAuthority, isWiserrReactivationSmsExecutionAuthorityReady, assertWiserrReactivationSmsExecutionAuthorityReady } from './integrations/wiserr/reactivation-sms-authority.mjs';
 export { approvalBoundReactivationPlan, reactivationPlanApprovalHash, buildReactivationPlan, assertApprovedReactivationPlan, buildWiserrReactivationExecutionRequest } from './reactivation/plan.mjs';
 export { buildReactivationPolicyAction } from './reactivation/action.mjs';
