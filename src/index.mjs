@@ -218,7 +218,11 @@ export {
   buildAndPersistDurableGrowthRunManifest
 } from './runtime/growth-run-repository.mjs';
 export { buildTenantRecoveryReport } from './runtime/recovery-report.mjs';
-export { resolveGrowthOsDatabaseConfig } from './runtime/config.mjs';
+export {
+  GROWTHOS_EXECUTION_MODES,
+  resolveGrowthOsExecutionConfig,
+  resolveGrowthOsDatabaseConfig
+} from './runtime/config.mjs';
 export { REACTIVATION_DECISIONS, evaluateDormantLeadReactivation } from './opportunities/reactivation.mjs';
 export { validateWiserrGrowthSnapshot, toGrowthBusinessState, channelReadiness, chooseReactivationChannel } from './integrations/wiserr/growth-snapshot.mjs';
 export {
@@ -231,6 +235,17 @@ export {
   wiserrGrowthSnapshotAuthorityFingerprint,
   currentWiserrGrowthSnapshotProducerBasis
 } from './integrations/wiserr/growth-snapshot-authority.mjs';
+export {
+  WISERR_REACTIVATION_SMS_DEPENDENCY_ID,
+  WISERR_REACTIVATION_SMS_CONTRACT_NAME,
+  WISERR_REACTIVATION_SMS_CAPABILITY,
+  validateWiserrReactivationSmsAuthorityBasis,
+  wiserrReactivationSmsAuthorityFingerprint,
+  currentWiserrReactivationSmsObservedBasis,
+  evaluateWiserrReactivationSmsExecutionAuthority,
+  isWiserrReactivationSmsExecutionAuthorityReady,
+  assertWiserrReactivationSmsExecutionAuthorityReady
+} from './integrations/wiserr/reactivation-sms-authority.mjs';
 export { approvalBoundReactivationPlan, reactivationPlanApprovalHash, buildReactivationPlan, assertApprovedReactivationPlan, buildWiserrReactivationExecutionRequest } from './reactivation/plan.mjs';
 export { buildReactivationPolicyAction } from './reactivation/action.mjs';
 export {
