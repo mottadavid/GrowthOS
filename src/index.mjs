@@ -48,6 +48,7 @@ export {
 } from './runtime/wiserr-submission-result-ingestion.mjs';
 export { ingestWiserrReactivationSubmissionResultAndAdvanceCampaign } from './runtime/wiserr-submission-campaign-coordinator.mjs';
 export { reconcileWiserrReactivationSubmissionAndCampaign } from './runtime/wiserr-submission-reconciliation-coordinator.mjs';
+export { evaluateReactivationObservationAndCloseCampaign } from './runtime/reactivation-observation-close-coordinator.mjs';
 export {
   REACTIVATION_CAMPAIGN_RECORD_TYPE, durableCampaignIdForPlan, loadDurableReactivationCampaign,
   listDurableReactivationCampaigns, createDurableReactivationCampaign,
