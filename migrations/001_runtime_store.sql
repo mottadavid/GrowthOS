@@ -1,5 +1,3 @@
-BEGIN;
-
 CREATE TABLE IF NOT EXISTS growthos_records (
     tenant_id TEXT NOT NULL,
     record_type TEXT NOT NULL,
@@ -34,5 +32,3 @@ CREATE INDEX IF NOT EXISTS growthos_events_tenant_recorded_idx
 CREATE INDEX IF NOT EXISTS growthos_events_tenant_correlation_recorded_idx
     ON growthos_events (tenant_id, correlation_id, recorded_at ASC, event_id ASC)
     WHERE correlation_id IS NOT NULL;
-
-COMMIT;
