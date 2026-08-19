@@ -9,6 +9,7 @@ import { loadDurablePolicyAuthorization } from './policy-authorization-repositor
 import { loadDurableExecutionAttempt } from './execution-attempt-repository.mjs';
 import { listDurableWiserrReactivationCommands } from './wiserr-reactivation-command-repository.mjs';
 import { listDurableWiserrSubmissionResults } from './wiserr-submission-result-ingestion.mjs';
+import { listDurableExecutionEconomics } from './execution-economics-repository.mjs';
 import { listDurableBusinessOutcomes } from './business-outcome-repository.mjs';
 import { mutateAuthoritativeRuntimeState } from './atomic-store.mjs';
 
@@ -94,9 +95,7 @@ async function collectTransportProof({ store, tenantId, action, attempt }) {
   const resultRecords = await listDurableWiserrSubmissionResults({ store, tenantId, attemptId: attempt.attemptId });
   for (const record of resultRecords) {
     const result = record.payload.result;
-    if (result.commandId !== commandRecord?.payload.command.commandId) {
-      throw new Error('DURABLE_GROWTH_RUN_SUBMISSION_RESULT_COMMAND_MISMATCH');
-    }
+    if (result.commandId !== commandRecord?.payload.command.commandId) throw new Error('DURABLE_GROWTH_RUN_SUBMISSION_RESULT_COMMAND_MISMATCH');
   }
 
   const requiredOutcome = REQUIRED_CANONICAL_RESULT_BY_STATE[attempt.state] ?? null;
@@ -147,41 +146,17 @@ export async function buildAndPersistDurableGrowthRunManifest({
   runId = null,
   now = new Date()
 }) {
-  for (const [label, value] of Object.entries({ tenantId, snapshotId, opportunityEvaluationId, campaignId, experimentId, envelopeId, policyReceiptId, attemptId })) {
-    requiredString(value, label);
-  }
+  for (const [label, value] of Object.entries({ tenantId, snapshotId, opportunityEvaluationId, campaignId, experimentId, envelopeId, policyReceiptId, attemptId })) requiredString(value, label);
 
-  const snapshotRecord = await requireRecord(
-    () => loadDurableWiserrGrowthSnapshot({ store, tenantId, snapshotId }),
-    'DURABLE_GROWTH_RUN_SNAPSHOT_NOT_FOUND'
-  );
-  const opportunityRecord = await requireRecord(
-    () => loadDurableReactivationOpportunityEvaluation({ store, tenantId, evaluationId: opportunityEvaluationId }),
-    'DURABLE_GROWTH_RUN_OPPORTUNITY_NOT_FOUND'
-  );
-  if (opportunityRecord.payload.result.decision !== 'OPPORTUNITY' || !opportunityRecord.payload.result.opportunity) {
-    throw new Error('DURABLE_GROWTH_RUN_OPPORTUNITY_NOT_ACTIONABLE');
-  }
-  if (opportunityRecord.payload.snapshotId !== snapshotId || opportunityRecord.payload.snapshotHash !== snapshotRecord.payload.snapshotHash) {
-    throw new Error('DURABLE_GROWTH_RUN_OPPORTUNITY_SOURCE_MISMATCH');
-  }
+  const snapshotRecord = await requireRecord(() => loadDurableWiserrGrowthSnapshot({ store, tenantId, snapshotId }), 'DURABLE_GROWTH_RUN_SNAPSHOT_NOT_FOUND');
+  const opportunityRecord = await requireRecord(() => loadDurableReactivationOpportunityEvaluation({ store, tenantId, evaluationId: opportunityEvaluationId }), 'DURABLE_GROWTH_RUN_OPPORTUNITY_NOT_FOUND');
+  if (opportunityRecord.payload.result.decision !== 'OPPORTUNITY' || !opportunityRecord.payload.result.opportunity) throw new Error('DURABLE_GROWTH_RUN_OPPORTUNITY_NOT_ACTIONABLE');
+  if (opportunityRecord.payload.snapshotId !== snapshotId || opportunityRecord.payload.snapshotHash !== snapshotRecord.payload.snapshotHash) throw new Error('DURABLE_GROWTH_RUN_OPPORTUNITY_SOURCE_MISMATCH');
 
-  const campaignRecord = await requireRecord(
-    () => loadDurableReactivationCampaign({ store, tenantId, campaignId }),
-    'DURABLE_GROWTH_RUN_CAMPAIGN_NOT_FOUND'
-  );
-  const experimentRecord = await requireRecord(
-    () => loadDurableExperiment({ store, tenantId, experimentId }),
-    'DURABLE_GROWTH_RUN_EXPERIMENT_NOT_FOUND'
-  );
-  const policyRecord = await requireRecord(
-    () => loadDurablePolicyAuthorization({ store, tenantId, receiptId: policyReceiptId }),
-    'DURABLE_GROWTH_RUN_POLICY_NOT_FOUND'
-  );
-  const attemptRecord = await requireRecord(
-    () => loadDurableExecutionAttempt({ store, tenantId, attemptId }),
-    'DURABLE_GROWTH_RUN_ATTEMPT_NOT_FOUND'
-  );
+  const campaignRecord = await requireRecord(() => loadDurableReactivationCampaign({ store, tenantId, campaignId }), 'DURABLE_GROWTH_RUN_CAMPAIGN_NOT_FOUND');
+  const experimentRecord = await requireRecord(() => loadDurableExperiment({ store, tenantId, experimentId }), 'DURABLE_GROWTH_RUN_EXPERIMENT_NOT_FOUND');
+  const policyRecord = await requireRecord(() => loadDurablePolicyAuthorization({ store, tenantId, receiptId: policyReceiptId }), 'DURABLE_GROWTH_RUN_POLICY_NOT_FOUND');
+  const attemptRecord = await requireRecord(() => loadDurableExecutionAttempt({ store, tenantId, attemptId }), 'DURABLE_GROWTH_RUN_ATTEMPT_NOT_FOUND');
 
   const action = policyRecord.payload.action;
   const opportunity = opportunityRecord.payload.result.opportunity;
@@ -190,17 +165,14 @@ export async function buildAndPersistDurableGrowthRunManifest({
   const envelope = policyRecord.payload.envelope;
   const attempt = attemptRecord.payload;
   const policyReceipt = policyRecord.payload.receipt;
-  if (envelope.envelopeId !== envelopeId || policyRecord.payload.envelopeId !== envelopeId) {
-    throw new Error('DURABLE_GROWTH_RUN_POLICY_ENVELOPE_MISMATCH');
-  }
+  if (envelope.envelopeId !== envelopeId || policyRecord.payload.envelopeId !== envelopeId) throw new Error('DURABLE_GROWTH_RUN_POLICY_ENVELOPE_MISMATCH');
   const resolvedRunId = runId || `growth-run-${action.actionId}`;
 
   const transportProof = await collectTransportProof({ store, tenantId, action, attempt });
+  const economicsRecords = await listDurableExecutionEconomics({ store, tenantId, attemptId: attempt.attemptId });
 
   const correlations = [...new Set([resolvedRunId, campaign.campaignId, experiment.experimentId, action.actionId])];
-  const outcomeRecords = uniqueByRecordId((await Promise.all(
-    correlations.map(correlationId => listDurableBusinessOutcomes({ store, tenantId, correlationId }))
-  )).flat());
+  const outcomeRecords = uniqueByRecordId((await Promise.all(correlations.map(correlationId => listDurableBusinessOutcomes({ store, tenantId, correlationId })))).flat());
   const outcomeEvents = outcomeRecords.map(record => structuredClone(record.payload.event));
 
   const manifest = createGrowthRunManifest({
@@ -217,6 +189,12 @@ export async function buildAndPersistDurableGrowthRunManifest({
   });
   validateGrowthRunManifest(manifest);
 
+  const executionEconomics = economicsRecords.map(record => ({
+    recordId: record.recordId,
+    semanticHash: record.payload.semanticHash,
+    metricType: record.payload.observation.metricType
+  })).sort((a, b) => a.recordId.localeCompare(b.recordId));
+
   const sourceProof = {
     snapshotRecordHash: snapshotRecord.payload.snapshotHash,
     opportunityRecordHash: sha256Canonical(opportunityRecord.payload),
@@ -226,6 +204,7 @@ export async function buildAndPersistDurableGrowthRunManifest({
     evaluatedEnvelopeHash: policyRecord.payload.envelopeHash,
     attemptRecordHash: sha256Canonical(attemptRecord.payload),
     transport: transportProof,
+    executionEconomics,
     outcomeRecordHashes: outcomeRecords.map(record => ({ recordId: record.recordId, semanticHash: record.payload.semanticHash })).sort((a, b) => a.recordId.localeCompare(b.recordId))
   };
   const sourceProofHash = sha256Canonical(sourceProof);
@@ -257,6 +236,7 @@ export async function buildAndPersistDurableGrowthRunManifest({
         attemptId: attempt.attemptId,
         commandId: transportProof.command?.commandId ?? null,
         submissionResultCount: transportProof.results.length,
+        executionEconomicsObservationCount: executionEconomics.length,
         outcomeCount: outcomeRecords.length
       },
       correlationId: resolvedRunId
