@@ -1,5 +1,6 @@
 import { reactivationPlanApprovalHash } from './plan.mjs';
-import { channelReadiness, validateWiserrGrowthSnapshot } from '../integrations/wiserr/growth-snapshot.mjs';
+import { channelEligibility, validateWiserrGrowthSnapshot } from '../integrations/wiserr/growth-snapshot.mjs';
+import { validateCapacityExecutionProof } from '../core/capacity-execution-proof.mjs';
 import { isWiserrReactivationSmsExecutionAuthorityReady } from '../integrations/wiserr/reactivation-sms-authority.mjs';
 
 export const REACTIVATION_CAMPAIGN_STATES = Object.freeze([
@@ -119,6 +120,7 @@ export function assertCampaignPlanIntegrity(campaign) {
 export function evaluateReactivationCampaignStart({
   campaign,
   currentSnapshot,
+  capacityProof,
   executionAuthorityDecision,
   now = new Date()
 }) {
@@ -151,13 +153,17 @@ export function evaluateReactivationCampaignStart({
   if (currentSnapshot.tenantId !== campaign.tenantId) {
     return { decision: CAMPAIGN_START_DECISIONS.DENY, reasons: ['CURRENT_SNAPSHOT_TENANT_MISMATCH'] };
   }
-  if (currentSnapshot.completeness !== 'COMPLETE_FOR_PURPOSE') {
-    return { decision: CAMPAIGN_START_DECISIONS.NO_ACTION, reasons: ['CURRENT_BUSINESS_STATE_INCOMPLETE'] };
+  if (['STALE', 'UNAVAILABLE'].includes(currentSnapshot.completeness)) {
+    return { decision: CAMPAIGN_START_DECISIONS.NO_ACTION, reasons: ['CURRENT_BUSINESS_STATE_NOT_FRESH_ENOUGH'] };
   }
-  if (currentSnapshot.capacity.status !== 'AVAILABLE' || currentSnapshot.capacity.demandThrottleRecommended === true) {
+
+  try {
+    validateCapacityExecutionProof(capacityProof, { tenantId: campaign.tenantId, now });
+  } catch (error) {
+    const noAction = ['CAPACITY_EXECUTION_PROOF_NOT_AVAILABLE','CAPACITY_EXECUTION_PROOF_EXPIRED','CAPACITY_EXECUTION_PROOF_NOT_YET_VALID'].includes(error.message);
     return {
-      decision: CAMPAIGN_START_DECISIONS.NO_ACTION,
-      reasons: [`CURRENT_CAPACITY_${currentSnapshot.capacity.status}`]
+      decision: noAction ? CAMPAIGN_START_DECISIONS.NO_ACTION : CAMPAIGN_START_DECISIONS.DENY,
+      reasons: [error.message === 'capacity proof must be an object.' ? 'CAPACITY_EXECUTION_PROOF_REQUIRED' : error.message]
     };
   }
 
@@ -168,20 +174,21 @@ export function evaluateReactivationCampaignStart({
     return { decision: CAMPAIGN_START_DECISIONS.REQUIRE_REAPPROVAL, reasons: ['COHORT_DEFINITION_CHANGED'] };
   }
 
-  const readiness = channelReadiness(currentSnapshot, campaign.plan.channel);
-  if (!readiness.capabilityEnabled) {
-    return { decision: CAMPAIGN_START_DECISIONS.DENY, reasons: [`CURRENT_CAPABILITY_DISABLED:${readiness.capability}`] };
-  }
-  if (readiness.eligibleRecipients < 1) {
+  const eligibility = channelEligibility(currentSnapshot, campaign.plan.channel);
+  if (eligibility.eligibleRecipients < 1) {
     return { decision: CAMPAIGN_START_DECISIONS.NO_ACTION, reasons: ['NO_CURRENTLY_ELIGIBLE_RECIPIENTS'] };
   }
 
   return {
     decision: CAMPAIGN_START_DECISIONS.READY,
     reasons: ['CAMPAIGN_REVALIDATED_FOR_EXECUTION'],
-    dispatchMaxRecipients: Math.min(campaign.plan.cohort.plannedMaxRecipients, readiness.eligibleRecipients),
+    dispatchMaxRecipients: Math.min(campaign.plan.cohort.plannedMaxRecipients, eligibility.eligibleRecipients),
     currentSnapshotId: currentSnapshot.snapshotId,
-    currentEligibleRecipients: readiness.eligibleRecipients,
+    currentEligibleRecipients: eligibility.eligibleRecipients,
+    capacityBundleId: capacityProof.capacityBundleId,
+    capacityProofHash: capacityProof.proofHash,
+    capacitySemanticHash: capacityProof.capacitySemanticHash,
+    capacityAuthorityHash: capacityProof.authorityHash,
     executionAuthorityDependencyId: executionAuthorityDecision.metadata.dependencyId,
     executionAuthorityLockFingerprint: executionAuthorityDecision.metadata.lockFingerprint ?? null
   };
@@ -211,7 +218,7 @@ export function markReactivationCampaignObserving(campaign, { now = new Date() }
   };
 }
 
-export function markReactivationCampaignReconciliationRequired(campaign, { reason, now = new Date() } = {}) {
+export function markReactivationCampaignReconciliationRequired(campaign, { reason, now = new Date() }) {
   assertState(campaign, ['EXECUTING'], 'mark reconciliation required');
   requiredString(reason, 'reason');
   return {
