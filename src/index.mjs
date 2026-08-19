@@ -120,6 +120,11 @@ export {
   assertTenantStartupReady
 } from './runtime/startup-readiness.mjs';
 export {
+  RUNTIME_MODES,
+  bootstrapTenantRuntime,
+  assertExecutionRuntime
+} from './runtime/bootstrap.mjs';
+export {
   EXECUTION_ATTEMPT_RECORD_TYPE,
   loadDurableExecutionAttempt,
   listDurableExecutionAttempts,
