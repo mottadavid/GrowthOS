@@ -15,10 +15,13 @@ function normalizeBaseUrl(value) {
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && isLocalhost)) {
     throw new Error('WISERR_GROWTH_SNAPSHOT_TRANSPORT_REQUIRES_HTTPS');
   }
-  url.pathname = url.pathname.replace(/\/+$/, '');
+  const normalizedPath = url.pathname.replace(/\/+$/, '');
   url.search = '';
   url.hash = '';
-  return url;
+  return {
+    origin: url.origin,
+    basePath: normalizedPath === '/' ? '' : normalizedPath
+  };
 }
 
 function validateAccessToken(value) {
@@ -52,7 +55,7 @@ export function createWiserrGrowthSnapshotHttpTransport({
     positiveInteger(dormantDays, 'dormantDays');
 
     const token = validateAccessToken(await getAccessToken({ tenantId }));
-    const url = new URL(`${normalizedBaseUrl.origin}${normalizedBaseUrl.pathname}/api/tenant/growth/snapshot`);
+    const url = new URL(`${normalizedBaseUrl.origin}${normalizedBaseUrl.basePath}/api/tenant/growth/snapshot`);
     url.searchParams.set('dormantDays', String(dormantDays));
 
     let response;
