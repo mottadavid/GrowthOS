@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { sha256Canonical } from '../src/core/canonical.mjs';
+import { WISERR_REACTIVATION_SMS_DEPENDENCY_ID } from '../src/integrations/wiserr/reactivation-sms-authority.mjs';
 import { AtomicInMemoryRuntimeStore } from '../src/runtime/atomic-store.mjs';
 import { buildReactivationPlan } from '../src/reactivation/plan.mjs';
 import { wiserrReactivationCommandHash } from '../src/reactivation/wiserr-command.mjs';
@@ -107,6 +108,8 @@ function commandFor(campaignRecord, overrides = {}) {
     attemptId: 'attempt-1',
     attemptNumber: 1,
     idempotencyKey: 'growthos:tenant-1:action-1:hash:attempt:1',
+    executionAuthorityDependencyId: WISERR_REACTIVATION_SMS_DEPENDENCY_ID,
+    executionAuthorityLockFingerprint: 'd'.repeat(64),
     originalBusinessSnapshotId: p.businessSnapshotId,
     executionBusinessSnapshotId: 'snapshot-execution-1',
     cohortDefinitionId: p.cohort.definitionId,
@@ -190,7 +193,8 @@ test('self-consistent forged command still cannot change approved campaign seman
     { name: 'cohort', change: command => ({ ...command, cohortDefinitionVersion: 'v2' }), error: /COHORT_MISMATCH/ },
     { name: 'channel', change: command => ({ ...command, channel: 'email' }), error: /CHANNEL_MISMATCH/ },
     { name: 'snapshot', change: command => ({ ...command, originalBusinessSnapshotId: 'other-snapshot' }), error: /SNAPSHOT_MISMATCH/ },
-    { name: 'recipients', change: command => ({ ...command, maxRecipients: 500 }), error: /RECIPIENT_CEILING_INVALID/ }
+    { name: 'recipients', change: command => ({ ...command, maxRecipients: 500 }), error: /RECIPIENT_CEILING_INVALID/ },
+    { name: 'execution authority', change: command => ({ ...command, executionAuthorityDependencyId: 'wiserr-growth-snapshot-v1' }), error: /EXECUTION_AUTHORITY_MISMATCH/ }
   ];
 
   for (const item of cases) {
@@ -200,7 +204,7 @@ test('self-consistent forged command still cannot change approved campaign seman
     const changedBody = item.change(base);
     delete changedBody.commandHash;
     const forged = { ...changedBody, commandHash: sha256Canonical(changedBody) };
-    assert.equal(wiserrReactivationCommandHash(forged), forged.commandHash, `${item.name} command should be internally valid`);
+    assert.equal(wiserrReactivationCommandHash(forged), forged.commandHash, `${item.name} command should be internally hash-valid`);
     await assert.rejects(
       () => startDurableReactivationCampaignFromCommand({ store, tenantId: 'tenant-1', campaignId: record.recordId, command: forged, now: new Date('2026-08-18T20:03:00Z') }),
       item.error
