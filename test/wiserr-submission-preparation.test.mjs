@@ -17,6 +17,29 @@ import { WISERR_REACTIVATION_SMS_DEPENDENCY_ID } from '../src/integrations/wiser
 
 const NOW = new Date('2026-08-18T20:00:00.000Z');
 
+function executionRuntime(store, tenantId = 'tenant-1') {
+  return Object.freeze({
+    schemaVersion: 1,
+    tenantId,
+    mode: 'EXECUTION_ENABLED',
+    executionEnabled: true,
+    executionBlockers: [],
+    executionStore: store
+  });
+}
+
+function readOnlyRuntime(store, tenantId = 'tenant-1') {
+  return Object.freeze({
+    schemaVersion: 1,
+    tenantId,
+    mode: 'READ_ONLY',
+    executionEnabled: false,
+    executionBlockers: ['DEPLOYMENT_EXECUTION_DISABLED'],
+    executionStore: null,
+    readStore: store
+  });
+}
+
 function snapshot() {
   return {
     schemaVersion: 1,
@@ -61,12 +84,12 @@ async function setup() {
     result: null, error: null, reconciliation: null, events: []
   };
   await store.putRecord({ tenantId: 'tenant-1', recordType: 'execution_attempt', recordId: attempt.attemptId, indexKey: attempt.actionId, payload: attempt, expectedRevision: 0, now: NOW });
-  return { store, campaign, command };
+  return { store, runtime: executionRuntime(store), campaign, command };
 }
 
 test('preparation durably reaches EXECUTING plus SUBMITTING before exposing command', async () => {
-  const { store, campaign, command } = await setup();
-  const prepared = await preparePersistedWiserrReactivationSubmission({ store, tenantId: 'tenant-1', campaignId: campaign.recordId, commandId: command.commandId, now: NOW });
+  const { store, runtime, campaign, command } = await setup();
+  const prepared = await preparePersistedWiserrReactivationSubmission({ runtime, tenantId: 'tenant-1', campaignId: campaign.recordId, commandId: command.commandId, now: NOW });
   assert.equal(prepared.submissionAuthorized, true);
   assert.equal(prepared.campaignState, 'EXECUTING');
   assert.equal(prepared.attemptState, 'SUBMITTING');
@@ -77,31 +100,51 @@ test('preparation durably reaches EXECUTING plus SUBMITTING before exposing comm
   assert.equal(persistedAttempt.payload.state, 'SUBMITTING');
 });
 
-test('crash after campaign start but before attempt SUBMITTING can resume preparation exactly once', async () => {
+test('read-only runtime blocks before any campaign or attempt mutation', async () => {
   const { store, campaign, command } = await setup();
+  await assert.rejects(
+    () => preparePersistedWiserrReactivationSubmission({ runtime: readOnlyRuntime(store), tenantId: 'tenant-1', campaignId: campaign.recordId, commandId: command.commandId, now: NOW }),
+    error => error.code === 'GROWTHOS_RUNTIME_EXECUTION_DISABLED' && error.executionBlockers.includes('DEPLOYMENT_EXECUTION_DISABLED')
+  );
+  const persistedCampaign = await loadDurableReactivationCampaign({ store, tenantId: 'tenant-1', campaignId: campaign.recordId });
+  const persistedAttempt = await loadDurableExecutionAttempt({ store, tenantId: 'tenant-1', attemptId: command.attemptId });
+  assert.equal(persistedCampaign.payload.status, 'APPROVED');
+  assert.equal(persistedAttempt.payload.state, 'CREATED');
+});
+
+test('cross-tenant execution runtime is rejected before store use', async () => {
+  const { store, campaign, command } = await setup();
+  await assert.rejects(
+    () => preparePersistedWiserrReactivationSubmission({ runtime: executionRuntime(store, 'tenant-2'), tenantId: 'tenant-1', campaignId: campaign.recordId, commandId: command.commandId, now: NOW }),
+    /WISERR_SUBMISSION_RUNTIME_TENANT_MISMATCH/
+  );
+});
+
+test('crash after campaign start but before attempt SUBMITTING can resume preparation exactly once', async () => {
+  const { store, runtime, campaign, command } = await setup();
   await startDurableReactivationCampaignFromPersistedCommand({ store, tenantId: 'tenant-1', campaignId: campaign.recordId, commandId: command.commandId, now: NOW });
   const before = await loadDurableExecutionAttempt({ store, tenantId: 'tenant-1', attemptId: command.attemptId });
   assert.equal(before.payload.state, 'CREATED');
-  const prepared = await preparePersistedWiserrReactivationSubmission({ store, tenantId: 'tenant-1', campaignId: campaign.recordId, commandId: command.commandId, now: NOW });
+  const prepared = await preparePersistedWiserrReactivationSubmission({ runtime, tenantId: 'tenant-1', campaignId: campaign.recordId, commandId: command.commandId, now: NOW });
   assert.equal(prepared.campaignState, 'EXECUTING');
   assert.equal(prepared.attemptState, 'SUBMITTING');
 });
 
 test('retry after SUBMITTING refuses to return command again and requires reconciliation', async () => {
-  const { store, campaign, command } = await setup();
-  await preparePersistedWiserrReactivationSubmission({ store, tenantId: 'tenant-1', campaignId: campaign.recordId, commandId: command.commandId, now: NOW });
+  const { runtime, campaign, command } = await setup();
+  await preparePersistedWiserrReactivationSubmission({ runtime, tenantId: 'tenant-1', campaignId: campaign.recordId, commandId: command.commandId, now: NOW });
   await assert.rejects(
-    () => preparePersistedWiserrReactivationSubmission({ store, tenantId: 'tenant-1', campaignId: campaign.recordId, commandId: command.commandId, now: NOW }),
+    () => preparePersistedWiserrReactivationSubmission({ runtime, tenantId: 'tenant-1', campaignId: campaign.recordId, commandId: command.commandId, now: NOW }),
     error => error.message === 'WISERR_SUBMISSION_REPLAY_REFUSED:SUBMITTING' && error.requiresReconciliation === true
   );
 });
 
 test('missing attempt blocks before campaign mutation', async () => {
-  const { store, campaign, command } = await setup();
+  const { store, runtime, campaign, command } = await setup();
   const key = store.recordKey({ tenantId: 'tenant-1', recordType: 'execution_attempt', recordId: command.attemptId });
   store.records.delete(key);
   await assert.rejects(
-    () => preparePersistedWiserrReactivationSubmission({ store, tenantId: 'tenant-1', campaignId: campaign.recordId, commandId: command.commandId, now: NOW }),
+    () => preparePersistedWiserrReactivationSubmission({ runtime, tenantId: 'tenant-1', campaignId: campaign.recordId, commandId: command.commandId, now: NOW }),
     /WISERR_SUBMISSION_ATTEMPT_NOT_FOUND/
   );
   const unchanged = await loadDurableReactivationCampaign({ store, tenantId: 'tenant-1', campaignId: campaign.recordId });
