@@ -2,69 +2,60 @@
 
 **As of:** 2026-08-19 evening ET  
 **Primary repo:** `mottadavid/GrowthOS`  
-**GrowthOS main observed during handoff audit:** `a243d003cfc762e7c8badd5cabf61276dd6494e6`  
-**Related repos:** `mottadavid/Wiserr-OS` and `mottadavid/wiserr-ai-studio`
+**GrowthOS main observed during final audit:** `a243d003cfc762e7c8badd5cabf61276dd6494e6`  
+**Related repos:** `mottadavid/Wiserr-OS`, `mottadavid/wiserr-ai-studio`
 
-> **Important:** This project is being developed while many other Wiserr branches/PRs merge concurrently. Do not trust a branch, PR, SHA, roadmap checkbox, or this handoff blindly. At the beginning of a new chat/work session, re-read current `main`, current open PRs, GitHub Issue #1, and the canonical docs. Treat this handoff as the product/architecture/continuity document, not as permission to stale-merge code.
-
----
-
-# 0. NEW CHAT START PROMPT
-
-Paste the following into a fresh chat if needed:
-
-> We are continuing the GrowthOS / autonomous agency project. You are acting as CTO/lead product architect and must work from repository truth, not chat assumptions. First read `mottadavid/GrowthOS` current `main`, `README.md`, `AGENTS.md`, `docs/FULL_HANDOFF_2026-08-19.md`, GitHub Issue #1, `docs/WORLD_CLASS_AGENCY_BLUEPRINT.md`, `docs/ARCHITECTURE.md`, `docs/SYSTEM_BOUNDARIES.md`, `docs/AUTONOMY_CONTROL_PLANE.md`, `docs/SAFETY.md`, `docs/RUNTIME_PERSISTENCE.md`, and the current code/tests. Then inspect relevant current `mottadavid/Wiserr-OS` and `mottadavid/wiserr-ai-studio` authorities before changing cross-repo contracts. Many Wiserr PRs merge concurrently, so never merge a stale-base PR merely because its CI was green. Revalidate the exact current base/merge ref. Continue the highest-value next slice toward one real closed revenue loop. Do not invent capacity, messaging authority, consent, attribution, provider capability, or production readiness. Preserve fail-closed authority, exact approvals, bounded autonomy, durable evidence, no blind retries, and `NO_ACTION` when intervention is not justified. Do not expand into Meta/Google/social/SEO agents until the first revenue loop is proven unless current repo evidence changes the priority.
+> **Continuity rule:** many Wiserr/GrowthOS branches merge concurrently. At the start of a new session, re-read current `main`, open PRs, GrowthOS Issue #1, and the canonical docs. Never stale-merge because an old-base CI run was green. This handoff preserves product intent, architecture, doctrine, and the latest audited state; repository truth wins if newer.
 
 ---
 
-# 1. WHY THIS PROJECT EXISTS
+# 0. Paste this into the new chat
 
-The immediate business context was a managed marketing service for service businesses, beginning with **CKO Accounting Services / Cristiane**. The initial commercial agreement discussed was approximately **$1,200/month**, lower than the desired agency price, accepted as a Client Zero/proof opportunity with a potential Wiserr referral/channel relationship.
+> We are continuing the GrowthOS / autonomous agency project. Act as CTO/lead product architect and work from repository truth, not chat assumptions. First audit `mottadavid/GrowthOS` current `main`, `README.md`, `AGENTS.md`, `docs/FULL_HANDOFF_2026-08-19.md`, GitHub Issue #1, `docs/WORLD_CLASS_AGENCY_BLUEPRINT.md`, `docs/ARCHITECTURE.md`, `docs/SYSTEM_BOUNDARIES.md`, `docs/AUTONOMY_CONTROL_PLANE.md`, `docs/SAFETY.md`, `docs/RUNTIME_PERSISTENCE.md`, and the current code/tests. Then inspect the current relevant authorities in `mottadavid/Wiserr-OS` and `mottadavid/wiserr-ai-studio` before changing cross-repo contracts. Continue the highest-value next slice toward one real closed revenue loop. Preserve fail-closed tenant/authority/capacity/consent/budget/retry rules, exact approval binding, durable evidence, no blind retry after ambiguous side effects, conservative attribution, and `NO_ACTION` when intervention is not justified. Do not expand into Meta/Google/social/SEO agents until the first revenue loop is proven unless current repo evidence changes the priority.
 
-The core business problem:
+---
 
-- service businesses repeatedly say they need more business;
-- many have been burned by agencies and are reluctant to pay for ads or additional marketing spend;
-- if a managed service cannot show outcomes quickly enough, clients churn;
-- David needs the service to be highly streamlined because the goal is to fund continued Wiserr development without creating another labor-heavy agency;
-- the managed service therefore needs to deliver outcomes using the management fee first, with paid media as a secondary lever unless the client explicitly wants it or evidence makes it the best action.
+# 1. Why this exists
 
-The original non-paid priority stack included:
+The project began as a way to serve marketing clients without building a labor-heavy agency. Client Zero is **CKO Accounting Services / Cristiane**. The discussed managed fee was about **$1,200/month**, accepted below the preferred price to prove the model and potentially create a Wiserr referral/channel relationship.
 
-- database reactivation;
-- organic/social growth;
-- content;
+The recurring customer problem is clear: service businesses need more business, but many distrust agencies and do not want extra ad spend after being burned before. The service therefore needs to produce measurable outcomes with minimal recurring operator time and should prioritize actions that can work from the management fee before defaulting to paid media.
+
+Initial non-paid levers:
+
+- database/dormant-demand reactivation;
+- organic/social content;
 - reviews/referrals;
-- local SEO / GEO / discoverability;
+- local SEO/GEO/discoverability;
 - conversion/follow-up;
-- email/SMS/lifecycle work;
+- email/SMS/lifecycle;
 - offer improvement;
-- paid acquisition later or when justified.
+- paid media later or when evidence/client intent justifies it.
 
-The insight that changed the project was that the goal should not be “automate an agency task list.” The stronger goal is:
+The key evolution was from **“automate agency tasks”** to:
 
-> **Continuously decide and execute the next best justified action to grow the business.**
+> **Continuously identify and execute the highest-value justified growth action for the business.**
 
-Sometimes that action is content. Sometimes it is reactivation. Sometimes it is reviews. Sometimes it is ads. Sometimes it is fixing conversion. Sometimes the correct decision is **NO_ACTION** because evidence is weak or the business cannot fulfill more demand.
+Sometimes the correct action is a Reel. Sometimes reactivation. Sometimes reviews. Sometimes ads. Sometimes fixing follow-up. Sometimes **NO_ACTION** because evidence is weak or the business cannot fulfill more demand.
 
 ---
 
-# 2. NORTH STAR
+# 2. North Star
 
 Build a **world-class autonomous growth operating system for service businesses** that:
 
 1. continuously understands the business;
 2. understands customers, pipeline, capacity, economics, and outcomes;
 3. observes relevant market/customer/channel evidence;
-4. identifies the highest-value justified growth opportunities;
-5. proposes or executes actions within explicit owner-defined authority;
-6. uses deterministic software to enforce policy, budget, tenant, consent, capacity, and retry boundaries;
+4. identifies the highest-value justified opportunities;
+5. proposes or executes within owner-defined authority;
+6. uses deterministic software to enforce policy, tenant, budget, capacity, consent, and retry boundaries;
 7. converts demand through Wiserr/Luna rather than stopping at lead generation;
 8. attributes outcomes conservatively;
-9. learns from real bookings/sales/revenue rather than vanity metrics;
+9. learns from bookings/sales/revenue rather than vanity metrics;
 10. reduces recurring human labor without reducing quality or control.
 
-The target is not maximal autonomy. The target is:
+Target operating model:
 
 ```text
 senior human strategy / exception judgment
@@ -74,215 +65,53 @@ governed autonomous recurring execution
 closed-loop business outcome learning
 ```
 
-A mature account may eventually automate a very high percentage of recurring labor, while consequential judgment remains governed.
+---
+
+# 3. Product/repository boundaries
+
+## Wiserr OS owns canonical business truth
+
+Wiserr remains authority for tenants/users/permissions, contacts/customers/leads, CRM/pipeline, inbox/conversations, Luna, appointments/jobs, operational capacity authorities, opt-outs/DNC, canonical messaging, and canonical booking/sale/business outcomes.
+
+**GrowthOS must not create a competing CRM, permission system, messaging stack, or booking authority.**
+
+## GrowthOS owns growth intelligence + governed orchestration
+
+GrowthOS owns growth goals, opportunities, strategy/action portfolios, offer hypotheses, action envelopes/autonomy, campaign orchestration, future distribution/paid/local/SEO-GEO/reputation/lifecycle strategy, experiments, attribution, learning, and the marketing control plane.
+
+## AI Studio owns creative intelligence + production
+
+`wiserr-ai-studio` owns Human Content Farm, Brand Character Intelligence, Viral Format Discovery, Identity Profiles, human/synthetic/licensed identity provenance, voice/avatar/video/image/text production, provider orchestration, creative QC, and creative economics/provenance.
+
+GrowthOS decides **why/what/where** creative is needed. AI Studio decides **how** approved creative is produced.
+
+## Product shape
+
+Strategically GrowthOS is part of Wiserr. Technically it remains a separate service/repo while being proven. UX can ultimately live mainly inside Wiserr/Luna. This preserves optionality for managed agency, Wiserr add-on, vertical packages, or standalone GrowthOS.
 
 ---
 
-# 3. PRODUCT / REPOSITORY BOUNDARIES
+# 4. World-class autonomous agency blueprint
 
-## 3.1 Wiserr OS owns canonical business truth
+GrowthOS should become specialized governed departments, not one giant agent.
 
-Wiserr remains authority for:
+1. **Business & Customer Intelligence** — services, economics, goals, capacity, seasonality, customers/leads, pipeline, conversion, feedback, channel history.
+2. **Market Intelligence** — search demand, competitors, local market, reviews, content/platform patterns, offer/category movement.
+3. **Chief Growth Strategist** — ranks the best justified action across departments; can choose reactivation, conversion, reviews, local, content, SEO/GEO, paid, offer work, throttling, or NO_ACTION.
+4. **Offer Strategy** — pain/urgency, economics, proof, competition, capacity, pricing/risk reversal/CTA; consequential changes require approval.
+5. **Content & Creative** — delegated to AI Studio.
+6. **Distribution** — approved artifact → channel adaptation → schedule/publish/send → verify external ID → capture failures → measure.
+7. **Paid Acquisition** — later, bounded by account/objective/geography/audience/creative/budget/stop/validity envelopes; never unconstrained spend.
+8. **Lead Conversion / Lifecycle** — GrowthOS intent, Wiserr/Luna conversation/booking authority.
+9. **Attribution / Experiment / Learning** — source/story → creative → channel → signal → lead → booking → sale → revenue → cost/time, with conservative causal claims.
 
-- tenants, users, roles, permissions;
-- contacts, customers, leads;
-- CRM/pipeline;
-- conversations/inbox;
-- Luna;
-- appointments/jobs;
-- operational business state/capacity authorities;
-- communication suppression/opt-outs;
-- canonical messaging execution;
-- booking/sale/business outcomes;
-- tenant-facing operating experience.
-
-GrowthOS must **not** create a competing CRM, permission system, messaging stack, or booking authority.
-
-## 3.2 GrowthOS owns growth intelligence and governed orchestration
-
-GrowthOS owns:
-
-- growth goals;
-- opportunity detection;
-- opportunity ranking;
-- growth strategy/action portfolios;
-- offer hypotheses;
-- action envelopes/autonomy;
-- campaign orchestration;
-- distribution orchestration;
-- paid-media strategy/control later;
-- reputation/local/SEO-GEO/lifecycle strategy later;
-- experiments;
-- attribution;
-- growth learning;
-- marketing control plane.
-
-## 3.3 AI Studio owns creative intelligence + production
-
-`mottadavid/wiserr-ai-studio` is the creative department. It owns:
-
-- Human Content Farm;
-- Brand Character Intelligence;
-- Viral Format Discovery;
-- Identity Profiles;
-- human/synthetic/licensed identity provenance;
-- voice/avatar/video/image/text creative production;
-- provider orchestration;
-- creative QC;
-- creative economics/provenance.
-
-GrowthOS should ask **why / what / where** creative is needed. AI Studio decides **how** to safely create it.
-
-## 3.4 UX vs technical architecture
-
-Strategically GrowthOS is part of Wiserr. Technically it is a separate service/repository while the model is being proven. The eventual user experience can primarily live inside Wiserr/Luna even if the engine remains a separate service.
-
-This preserves optionality for a managed agency, a Wiserr add-on, vertical packages, or a standalone GrowthOS later.
+Strategy horizons: real-time incidents; daily execution; weekly creative/lead-quality/experiments; monthly offer/channel/economics; quarterly ICP/positioning/market strategy.
 
 ---
 
-# 4. THE WORLD-CLASS AUTONOMOUS AGENCY BLUEPRINT
+# 5. Autonomy doctrine
 
-GrowthOS should eventually operate like departments, not one giant free-running agent.
-
-## Department 1 — Business & Customer Intelligence
-
-Continuously understands:
-
-- services/products;
-- prices/economics/margins where available;
-- goals;
-- capacity;
-- seasonality;
-- customers/leads;
-- pipeline;
-- conversion history;
-- reviews/feedback;
-- channel/campaign history.
-
-Output: current business state, completeness/freshness, meaningful changes.
-
-## Department 2 — Market Intelligence
-
-Evidence may include:
-
-- search demand;
-- competitor positioning;
-- local market movement;
-- reviews/reputation;
-- content/platform patterns;
-- offer/category movement;
-- relevant trend evidence.
-
-Output: sourced opportunities/threats with freshness and uncertainty.
-
-## Department 3 — Chief Growth Strategist
-
-Core question:
-
-> Given goals, business state, market state, constraints, capacity, economics, and prior evidence, what is the highest-value justified action now?
-
-It must rank across departments rather than default to content or ads.
-
-Valid answers include:
-
-- reactivate dormant demand;
-- fix follow-up/conversion;
-- request reviews/referrals;
-- repair local presence;
-- create content;
-- improve SEO/GEO;
-- test paid acquisition;
-- change an offer;
-- reduce acquisition due to capacity;
-- **NO_ACTION**.
-
-## Department 4 — Offer Strategy
-
-Analyzes audience pain, urgency, service economics, proof, competition, capacity, price/risk reversal, and CTA. Agents may draft hypotheses; consequential pricing/discount/guarantee changes require explicit authority.
-
-## Department 5 — Content & Creative
-
-Delegated to AI Studio. Inputs from GrowthOS include campaign objective, audience, channel, content intent, and preferred identity class. AI Studio handles source truth, format, identity, production, QC, and creative provenance.
-
-## Department 6 — Distribution
-
-Eventually:
-
-```text
-approved artifact
-→ channel adaptation
-→ metadata/schedule
-→ publish/send
-→ verify external ID
-→ capture failure
-→ measure
-```
-
-Potential channels: social, email, messaging, GBP, web/CMS, etc., only where current API/policy authority exists.
-
-## Department 7 — Paid Acquisition
-
-Later, only after control plane and outcome loop are proven. Never unconstrained budget authority. Typical envelope includes account, objective, geography, audience, creatives, daily/total budget, allowed optimization movement, stop conditions, and validity window.
-
-## Department 8 — Lead Conversion / Lifecycle
-
-GrowthOS coordinates intent. Wiserr/Luna remains conversation/execution authority:
-
-```text
-lead/customer signal
-→ immediate response
-→ qualification
-→ booking
-→ reminder/follow-up
-→ won/lost outcome
-```
-
-This is a major structural advantage over a conventional agency that stops at “lead generated.”
-
-## Department 9 — Attribution / Experiment / Learning
-
-Evidence chain can include:
-
-```text
-source/story
-format/hook
-identity
-creative
-channel
-spend
-impressions/views
-retention/engagement
-click/message
-lead
-qualified lead
-booking
-sale
-revenue outcome
-human/provider cost
-```
-
-The system learns from business outcomes, not production volume.
-
----
-
-# 5. STRATEGY HORIZONS
-
-GrowthOS should eventually reason on multiple horizons so it does not overreact to noise.
-
-**Real-time:** hard policy/spend breaches, lead-response failures, severe platform/reputation incidents.  
-**Daily:** execution health, campaign health, ordinary distribution/community exceptions.  
-**Weekly:** creative performance, lead quality, experiments, bounded reallocation.  
-**Monthly:** offer/channel mix, capacity-aware growth plan, unit economics, content strategy.  
-**Quarterly:** ICP, positioning, market shifts, major growth priorities.
-
----
-
-# 6. AUTONOMY DOCTRINE
-
-There is no global `autonomous=true`.
-
-Autonomy levels:
+No global `autonomous=true`.
 
 ```text
 L0 OBSERVE
@@ -293,166 +122,226 @@ L4 BOUNDED_AUTONOMOUS
 L5 LOW_RISK_AUTONOMOUS
 ```
 
-L5 is not “more power” than L4; allowed autonomy levels are explicit sets, not a numeric maximum.
+L5 is not numerically “more authority” than L4; allowed levels are explicit sets.
 
-Examples:
-
-- analyze metrics: autonomous;
-- generate ideas: autonomous;
-- draft content: autonomous;
-- publish pre-approved scheduled content: potentially bounded autonomous;
-- ordinary review response: potentially bounded autonomous;
-- lead follow-up: potentially bounded autonomous under communication authority;
-- launch new paid test: approval;
-- change offer/pricing: approval;
-- increase total budget: approval;
-- make consequential guarantees: approval.
-
-## Core rule
+Core rule:
 
 > **Intelligence proposes. Deterministic policy decides whether execution is permitted.**
 
-The control plane validates tenant, delegate, action family, channel/account/geography, spend, recipients, attempts, capacity, freshness, approvals, validity windows, and consequential changes.
+Policy decisions are `ALLOW`, `REQUIRE_APPROVAL`, `DENY`, or `NO_ACTION`.
 
-Possible decisions:
-
-```text
-ALLOW
-REQUIRE_APPROVAL
-DENY
-NO_ACTION
-```
+The control plane checks tenant, delegate, action family, channel/account/geography, spend, recipients, attempts, capacity, freshness, approvals, validity windows, and consequential changes.
 
 ---
 
-# 7. NON-NEGOTIABLE SAFETY / RELIABILITY DOCTRINE
+# 6. Non-negotiable doctrine
 
-1. **Tenant isolation is load-bearing.** Never trust caller-selected tenant identity when canonical authority exists.
-2. **No invented authority.** Transport existence is not permission to use it.
-3. **No invented capacity.** `authoritative: true` is not sufficient; the source itself needs current authority.
-4. **No blind retry after ambiguous external side effects.** Unknown provider/channel outcome becomes reconciliation work.
-5. **Approval binds the exact consequential action.** Post-approval mutation invalidates authority.
-6. **Historical authority is immutable evidence.** Later revocation must not rewrite what was valid at execution time.
-7. **Read authority, capacity authority, communication authority, autonomy authority, policy approval, execution certainty, and outcome attribution are separate concepts.**
-8. **Fail toward less autonomy.** Replacement/crash paths should temporarily reduce authority, not widen it.
-9. **Process startup is read-only by default.** Healthy infrastructure is not execution authority.
-10. **`NO_ACTION` is a valid high-quality outcome.** The system must know when not to intervene.
-11. **Do not optimize vanity metrics as if they were revenue.**
-12. **Do not call correlation causation.** DIRECT attribution requires canonical outcome + direct correlation + evidence.
-13. **No private campaign content in compact audit events where hashes/IDs suffice.**
-14. **Cross-repo authority is evidence-driven.** OBSERVED/CANDIDATE/CERTIFIED/REVOKED receipts + semantic fingerprints.
-15. **Never stale-merge a cross-repo PR simply because old-base CI passed.** Re-check current base/merge ref.
+- Tenant isolation is load-bearing.
+- Transport existence is not execution authority.
+- `authoritative: true` is not capacity authority.
+- Read authority, capacity authority, communication authority, autonomy authority, policy approval, execution certainty, and attribution are separate.
+- Approval binds the exact consequential action; mutation invalidates it.
+- Unknown external outcome becomes reconciliation work, never blind retry.
+- Historical authority remains immutable evidence even if live authority is later revoked.
+- Failure should reduce autonomy, not widen it.
+- Startup defaults read-only; healthy infrastructure is not execution permission.
+- `NO_ACTION` is a valid high-quality result.
+- Do not equate engagement with revenue.
+- DIRECT attribution requires canonical outcome + direct correlation + evidence.
+- Compact audit evidence should use IDs/hashes instead of private message content where possible.
+- Cross-repo authority uses OBSERVED/CANDIDATE/CERTIFIED/REVOKED receipts and semantic fingerprints.
+- Never stale-merge cross-repo work merely because CI passed on an old base.
 
 ---
 
-# 8. FIRST VERTICAL SLICE — OWNED-DEMAND REACTIVATION
+# 7. First vertical slice: owned-demand reactivation
 
-This was deliberately selected before ads/social/SEO because it can prove the complete business loop with lower platform complexity and can produce value from existing business assets without requiring ad spend.
-
-Target loop:
+Chosen before ads/social/SEO because it can prove the full revenue loop with lower platform complexity and without requiring ad spend.
 
 ```text
 canonical Wiserr business state
-        ↓
-dormant demand detected
-        ↓
-GrowthOS opportunity
-        ↓
-campaign hypothesis
-        ↓
-action envelope + exact approval
-        ↓
-current capacity proof
-        ↓
-current communication authority
-        ↓
-exact recipient resolution in Wiserr
-        ↓
-canonical Wiserr outbound messaging
-        ↓
-reply
-        ↓
-Luna qualification / booking
-        ↓
-canonical booking / sale outcome
-        ↓
-GrowthOS attribution + experiment close
-        ↓
-learning
-        ↓
-next best action
+→ dormant demand detected
+→ GrowthOS opportunity
+→ campaign hypothesis
+→ exact approval/action envelope
+→ current capacity proof
+→ current communication authority
+→ exact recipient resolution in Wiserr
+→ canonical Wiserr outbound messaging
+→ reply
+→ Luna qualification/booking
+→ canonical booking/sale outcome
+→ GrowthOS attribution/experiment close
+→ learning
+→ next best action
 ```
 
-## Important separation now encoded
+Critical separation now encoded:
 
 ```text
-Wiserr snapshot
-→ cohort + eligibility evidence
-
-Capacity authority
-→ permission to increase demand
-
-SMS execution authority
-→ permission to send dormant-lead marketing SMS
+Wiserr snapshot = cohort + eligibility evidence
+Capacity authority = permission to increase demand
+SMS authority = permission to send dormant-lead marketing SMS
 ```
 
-A snapshot can be `PARTIAL`, have embedded capacity `UNKNOWN`, and have `reactivationSms=false`, while planning remains possible from aggregate eligibility. Execution still requires independent current capacity and communication proofs.
+A snapshot may remain `PARTIAL`, embedded capacity `UNKNOWN`, and `reactivationSms=false`; planning can still use aggregate eligibility. Execution requires independent current capacity and communication proofs.
 
 ---
 
-# 9. WHAT IS ALREADY BUILT IN GROWTHOS
+# 8. What GrowthOS has built
 
-The following is not conceptual only; it is implemented in code/tests on current GrowthOS `main` unless repository truth has moved after this handoff.
+## Control plane / authority
 
-## 9.1 Foundation / control plane
-
-- dedicated GrowthOS repository;
-- canonical architecture/boundary docs;
-- world-class autonomous agency blueprint;
-- Wiserr + AI Studio integration contracts;
-- L0–L5 autonomy model;
 - deterministic action-policy evaluator;
-- tenant/action-family enforcement;
-- channel/account/geography restrictions;
+- tenant/action-family/channel/account/geography enforcement;
 - recipient/attempt/spend/change ceilings;
-- capacity-aware `NO_ACTION`;
+- capacity-aware NO_ACTION;
 - budget/price/discount escalation;
-- exact action approval fingerprint;
-- immutable policy decision receipts;
-- external delegation assertions;
-- explicit granting actor vs delegate subject;
-- envelope activation/revocation/replacement lifecycle;
-- durable action envelopes;
-- cross-repo authority receipts;
-- semantic upstream contract fingerprints.
+- exact approval-bound action fingerprint;
+- immutable policy receipts;
+- external delegation authority;
+- granting actor separated from delegate subject;
+- durable envelope activation/revocation/replacement;
+- cross-repo authority receipts and semantic fingerprints;
+- process-level execution kill switch.
 
-## 9.2 Crash/retry/reconciliation safety
+## Runtime durability / PostgreSQL readiness
 
-- execution-attempt state machine;
-- durable action-scoped attempt history;
-- stable idempotency identity;
-- unresolved attempt blocks another attempt;
-- SUBMITTING/ACCEPTED/unknown outcome requires reconciliation;
-- definitive failure vs not-accepted vs ambiguous outcome separated;
-- attempt ceilings survive restart;
-- restart recovery inspector;
-- persisted commands included in recovery inspection;
-- no unattended replay on unresolved state.
-
-## 9.3 Durable runtime / PostgreSQL readiness
-
-- dedicated `GROWTHOS_DATABASE_URL`; no fallback to Wiserr DB URL;
-- CAS/versioned records;
+- `GROWTHOS_DATABASE_URL` only; no fallback to Wiserr `DATABASE_URL`;
+- CAS/versioned state records;
 - append-only events;
-- payload integrity hashes;
 - tenant/type/index-scoped recovery;
+- payload integrity hashes;
 - immutable secondary recovery keys;
 - atomic state + evidence-event mutation;
-- Postgres adapter contract;
-- pool transaction adapter;
-- SQL migrations;
-- checksum-safe migration runner;
-- advisory migration lock;
-- migration checksum drift refusal;
+- Postgres store + transaction adapter;
+- transaction-neutral SQL migrations;
+- checksum-safe migration runner + advisory lock;
+- checksum drift refusal;
 - database certification evaluator;
 - schema/migration/index/rollback probe;
+- startup readiness gate;
+- read-only bootstrap by default;
+- execution requires explicit request + process enablement + clean readiness;
+- restart recovery inspector.
+
+**Still not proven:** actual GrowthOS DB/user provisioned, migrations against live Postgres, live integration test, forced rollback on real DB, real restart/recovery drill, backup restore proof, production DB secret deployment.
+
+## Capacity
+
+- capacity evidence model;
+- complete/fresh/authoritative requirement for `AVAILABLE`;
+- FULL/CONSTRAINED precedence;
+- stale/expired evidence → UNKNOWN/throttle;
+- capacity-source authority assertions;
+- constraint-only authority can throttle but cannot grant availability;
+- forged `authoritative: true` cannot unlock demand;
+- durable capacity evidence + authority bundle;
+- execution-time capacity proof.
+
+## Business state / opportunity
+
+- bounded Wiserr growth snapshot schema;
+- read-client authority/freshness/tenant validation;
+- durable certified snapshot + upstream proof;
+- source-derived dormant-demand opportunity;
+- opportunity identity binds snapshot hash + capacity semantic hash + detector policy hash;
+- stale source/expired capacity cannot reuse a historical opportunity as current.
+
+## Campaign / experiment / policy
+
+- exact reactivation plan + approval hash;
+- durable campaign lifecycle;
+- external approval authority reference;
+- execution-time revalidation;
+- current eligibility can reduce dispatch ceiling;
+- cohort drift blocks/requires reapproval;
+- deterministic experiment lifecycle;
+- durable experiment approval/evidence/guardrails/closure;
+- durable exact policy action + evaluated envelope + receipt.
+
+## Execution safety
+
+- durable action-scoped execution attempts;
+- stable idempotency;
+- unresolved attempt blocks another attempt;
+- definitive failure / not accepted / ambiguous separated;
+- exact Wiserr command binds campaign/experiment/policy/envelope/action/attempt/snapshot/capacity/SMS authority;
+- exact command persisted immutably before handoff;
+- command tamper detection;
+- restart inspector includes persisted commands;
+- submission preparation persists `campaign=EXECUTING` and `attempt=SUBMITTING` before transport receives the command;
+- once attempt is `SUBMITTING`, command replay is refused and reconciliation is required;
+- command can resume only in the safe pre-external-contact window (`EXECUTING` + attempt still `CREATED`);
+- transport/result/reconciliation coordination exists on current main per Issue #1; re-audit exact modules before changing it.
+
+## Outcomes / learning
+
+- durable canonical business-outcome repository;
+- dedup by canonical business outcome, not webhook delivery ID;
+- execution certainty separated from attribution confidence;
+- DIRECT attribution requires evidence;
+- durable Growth Run Manifest;
+- final proof built from persisted authoritative records;
+- frozen evaluated envelope preserves historical authority after later revocation;
+- sealed run proof cannot silently absorb later outcomes;
+- execution economics ledger exists per current tracker; exercise it in first live loop.
+
+---
+
+# 9. Wiserr integration status
+
+The repeatedly recut bounded producer was finally merged as **Wiserr PR #1726**. It is deliberately conservative:
+
+- aggregate dormant cohort only;
+- no recipient PII;
+- `PARTIAL` completeness;
+- embedded capacity `UNKNOWN`;
+- channel eligibility separated from execution capability;
+- execution/Luna/outcome capabilities false in the producer itself.
+
+GrowthOS current `main` observed during this handoff contains a later commit titled **“certify mounted Wiserr snapshot authority from retained evidence.”** Therefore the read side has progressed beyond the older Issue #1 wording. **New chat must re-audit current GrowthOS/Wiserr main and retained certification evidence before assuming the exact mounted route/capability state.**
+
+Do not infer from read certification that SMS, Luna campaign context, booking outcomes, or revenue outcomes are certified.
+
+## Wiserr messaging facts already audited
+
+Wiserr already has a canonical SMS authority with kill switch, suppression/DNC handling, tenant program/compliance checks, rate limits, idempotency/correlation, provider orchestration, and ambiguity/reconciliation behavior.
+
+But **“Wiserr can send SMS” is not “GrowthOS may send dormant-lead marketing SMS.”**
+
+GrowthOS therefore has a separate dependency `wiserr-reactivation-sms-v1`. Its observed state remains non-executable until evidence proves all required pieces, including an explicit GrowthOS/reactivation marketing purpose, compliance review, campaign/use-case coverage, consent/opt-in evidence, canonical send path, result classification, and reconciliation lookup.
+
+**Never repurpose `follow_up`, Luna, or transactional purposes as marketing authority.**
+
+---
+
+# 10. AI Studio / creative program
+
+AI Studio is a separate but connected workstream.
+
+## Three engines
+
+1. **Content Farm** — what authentic thing should be said?
+2. **Viral Format Discovery** — how should a verified idea be packaged?
+3. **AI Studio Production** — how is it produced through identity/voice/avatar/video/edit/QC/review?
+
+## Human Content Farm doctrine
+
+> **Excavate, do not fabricate.**
+
+Real client life, expertise, beliefs, mistakes, stories, and vocabulary are source-backed. Story Atoms have source references and truth states such as `DIRECT`, `SUPPORTED_INFERENCE`, `NEEDS_CONFIRMATION`, `PRIVATE`, `REDACTED`.
+
+The secure interview foundation exists. The **real methodology is intentionally waiting on the purchased storytelling course/resources**. Do not guess it.
+
+Next after course ingestion: adaptive follow-up → Story Atoms → confirmation queue → Story Bank → Content Seeds → source-backed drafts.
+
+## Synthetic brand characters
+
+AI Studio must support more than human clones. Long-term identity origins:
+
+- `AUTHORIZED_HUMAN`;
+- `ORIGINAL_SYNTHETIC`;
+- `LICENSED_CHARACTER`.
+
+Synthetic characters use a **Character Bible**, not fake Content DNA. They may represent brand/product/industry knowledge but must not fabricate firsthand human history. Example: a BuildOS contractor character can explain
