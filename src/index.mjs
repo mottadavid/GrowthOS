@@ -115,6 +115,11 @@ export {
   assertRuntimeDatabaseReady
 } from './runtime/database-certification.mjs';
 export {
+  evaluateStartupReadiness,
+  inspectTenantStartupReadiness,
+  assertTenantStartupReady
+} from './runtime/startup-readiness.mjs';
+export {
   EXECUTION_ATTEMPT_RECORD_TYPE,
   loadDurableExecutionAttempt,
   listDurableExecutionAttempts,
