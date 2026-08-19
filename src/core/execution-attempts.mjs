@@ -7,6 +7,7 @@ export const EXECUTION_ATTEMPT_STATES = Object.freeze({
   ACCEPTED: 'ACCEPTED',
   COMPLETED: 'COMPLETED',
   DEFINITIVE_FAILURE: 'DEFINITIVE_FAILURE',
+  SUPPRESSED: 'SUPPRESSED',
   RECONCILIATION_REQUIRED: 'RECONCILIATION_REQUIRED',
   RECONCILED_COMPLETED: 'RECONCILED_COMPLETED',
   RECONCILED_FAILED: 'RECONCILED_FAILED',
@@ -29,18 +30,11 @@ function nowIso(now = new Date()) {
 function appendEvent(attempt, type, metadata = {}, now = new Date()) {
   const at = nowIso(now);
   attempt.updatedAt = at;
-  attempt.events.push({
-    eventId: crypto.randomUUID(),
-    type,
-    at,
-    ...metadata
-  });
+  attempt.events.push({ eventId: crypto.randomUUID(), type, at, ...metadata });
 }
 
 function assertState(attempt, allowed, operation) {
-  if (!allowed.includes(attempt.state)) {
-    throw new Error(`${operation} not allowed from ${attempt.state}.`);
-  }
+  if (!allowed.includes(attempt.state)) throw new Error(`${operation} not allowed from ${attempt.state}.`);
 }
 
 export function hasUnresolvedExecutionAttempt(attempts = []) {
@@ -49,6 +43,9 @@ export function hasUnresolvedExecutionAttempt(attempts = []) {
 
 export function assertExecutionAttemptAvailable(attempts = [], maxAttempts = 1) {
   if (!Number.isInteger(maxAttempts) || maxAttempts < 1) throw new Error('maxAttempts must be a positive integer.');
+  if (attempts.some(attempt => attempt.state === EXECUTION_ATTEMPT_STATES.SUPPRESSED)) {
+    throw new Error('EXECUTION_SUPPRESSED_RETRY_FORBIDDEN');
+  }
   if (hasUnresolvedExecutionAttempt(attempts)) throw new Error('RECONCILIATION_REQUIRED_BEFORE_NEW_ATTEMPT');
   if (attempts.length >= maxAttempts) throw new Error('EXECUTION_ATTEMPT_LIMIT_EXCEEDED');
   return true;
@@ -58,27 +55,15 @@ export function createExecutionAttempt({ action, attempts = [], maxAttempts = 1,
   if (!action || typeof action !== 'object') throw new Error('action is required.');
   if (!action.tenantId || !action.actionId) throw new Error('action tenantId and actionId are required.');
   assertExecutionAttemptAvailable(attempts, maxAttempts);
-
   const attemptNumber = attempts.length + 1;
   const actionHash = actionApprovalHash(action);
   const createdAt = nowIso(now);
   const attemptId = crypto.randomUUID();
   const attempt = {
-    schemaVersion: 1,
-    attemptId,
-    tenantId: action.tenantId,
-    actionId: action.actionId,
-    actionHash,
-    attemptNumber,
+    schemaVersion: 1, attemptId, tenantId: action.tenantId, actionId: action.actionId, actionHash, attemptNumber,
     idempotencyKey: `growthos:${action.tenantId}:${action.actionId}:${actionHash}:attempt:${attemptNumber}`,
-    state: EXECUTION_ATTEMPT_STATES.CREATED,
-    createdAt,
-    updatedAt: createdAt,
-    externalExecutionId: null,
-    result: null,
-    error: null,
-    reconciliation: null,
-    events: []
+    state: EXECUTION_ATTEMPT_STATES.CREATED, createdAt, updatedAt: createdAt, externalExecutionId: null,
+    result: null, error: null, suppression: null, reconciliation: null, events: []
   };
   appendEvent(attempt, 'EXECUTION_ATTEMPT_CREATED', { actionHash }, now);
   return attempt;
@@ -115,6 +100,17 @@ export function markExecutionDefinitiveFailure(attempt, error, now = new Date())
   return attempt;
 }
 
+export function markExecutionSuppressed(attempt, { classification, evidenceRef = null } = {}, now = new Date()) {
+  assertState(attempt, [EXECUTION_ATTEMPT_STATES.SUBMITTING], 'markExecutionSuppressed');
+  if (typeof classification !== 'string' || !classification.trim()) throw new Error('suppression.classification is required.');
+  if (evidenceRef !== null && (typeof evidenceRef !== 'string' || !evidenceRef.trim())) throw new Error('suppression.evidenceRef must be a non-empty string or null.');
+  attempt.state = EXECUTION_ATTEMPT_STATES.SUPPRESSED;
+  attempt.suppression = { classification: classification.trim(), evidenceRef };
+  attempt.error = null;
+  appendEvent(attempt, 'EXECUTION_SUPPRESSED', { classification: attempt.suppression.classification, evidenceRef }, now);
+  return attempt;
+}
+
 export function markExecutionNotAccepted(attempt, evidence = null, now = new Date()) {
   assertState(attempt, [EXECUTION_ATTEMPT_STATES.SUBMITTING], 'markExecutionNotAccepted');
   attempt.state = EXECUTION_ATTEMPT_STATES.NOT_ACCEPTED;
@@ -127,10 +123,7 @@ export function markExecutionReconciliationRequired(attempt, error, now = new Da
   assertState(attempt, [EXECUTION_ATTEMPT_STATES.SUBMITTING, EXECUTION_ATTEMPT_STATES.ACCEPTED], 'markExecutionReconciliationRequired');
   attempt.state = EXECUTION_ATTEMPT_STATES.RECONCILIATION_REQUIRED;
   attempt.error = { message: String(error?.message || error || 'Execution outcome unknown') };
-  appendEvent(attempt, 'EXECUTION_RECONCILIATION_REQUIRED', {
-    externalExecutionId: attempt.externalExecutionId,
-    error: attempt.error
-  }, now);
+  appendEvent(attempt, 'EXECUTION_RECONCILIATION_REQUIRED', { externalExecutionId: attempt.externalExecutionId, error: attempt.error }, now);
   return attempt;
 }
 
@@ -139,21 +132,13 @@ export function reconcileExecutionAttempt(attempt, { outcome, by, evidence, resu
   if (!['COMPLETED', 'FAILED', 'NOT_ACCEPTED'].includes(outcome)) throw new Error('Invalid reconciliation outcome.');
   if (typeof by !== 'string' || !by.trim()) throw new Error('reconciliation.by is required.');
   if (typeof evidence !== 'string' || !evidence.trim()) throw new Error('reconciliation.evidence is required.');
-
-  attempt.reconciliation = {
-    outcome,
-    by,
-    evidence,
-    reconciledAt: nowIso(now)
-  };
-
+  attempt.reconciliation = { outcome, by, evidence, reconciledAt: nowIso(now) };
   if (outcome === 'COMPLETED') {
     attempt.state = EXECUTION_ATTEMPT_STATES.RECONCILED_COMPLETED;
     attempt.result = result || {};
   } else {
     attempt.state = EXECUTION_ATTEMPT_STATES.RECONCILED_FAILED;
   }
-
   appendEvent(attempt, 'EXECUTION_RECONCILED', { outcome, by, evidence }, now);
   return attempt;
 }
