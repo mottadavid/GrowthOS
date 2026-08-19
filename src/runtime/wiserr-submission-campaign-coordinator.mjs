@@ -1,5 +1,5 @@
 import { assertExecutionRuntime } from './bootstrap.mjs';
-import { ingestWiserrReactivationSubmissionResult } from './wiserr-submission-result-ingestion.mjs';
+import { validateWiserrSubmissionResult, ingestWiserrReactivationSubmissionResult } from './wiserr-submission-result-ingestion.mjs';
 import { loadDurableWiserrReactivationCommand } from './wiserr-reactivation-command-repository.mjs';
 import {
   loadDurableReactivationCampaign,
@@ -35,67 +35,69 @@ function assertExistingReason(actual, expected, code) {
   if (actual !== expected) throw new Error(code);
 }
 
+function assertCampaignCanApply(campaign, result) {
+  const status = campaign.status;
+  const reason = reasonFor(result);
+  if (result.outcome === 'ACCEPTED' || result.outcome === 'COMPLETED') {
+    if (!['EXECUTING', 'OBSERVING', 'COMPLETED'].includes(status)) throw new Error(`WISERR_SUBMISSION_CAMPAIGN_RESULT_STATE_CONFLICT:${status}`);
+    return;
+  }
+  if (result.outcome === 'AMBIGUOUS') {
+    if (status === 'RECONCILIATION_REQUIRED') assertExistingReason(campaign.failureReason, reason, 'WISERR_SUBMISSION_CAMPAIGN_RECONCILIATION_REASON_CONFLICT');
+    else if (status !== 'EXECUTING') throw new Error(`WISERR_SUBMISSION_CAMPAIGN_RESULT_STATE_CONFLICT:${status}`);
+    return;
+  }
+  if (result.outcome === 'SUPPRESSED') {
+    if (status === 'STOPPED') assertExistingReason(campaign.stopReason, reason, 'WISERR_SUBMISSION_CAMPAIGN_STOP_REASON_CONFLICT');
+    else if (status !== 'EXECUTING') throw new Error(`WISERR_SUBMISSION_CAMPAIGN_RESULT_STATE_CONFLICT:${status}`);
+    return;
+  }
+  if (['NOT_ACCEPTED', 'DEFINITIVE_FAILURE'].includes(result.outcome)) {
+    if (status === 'FAILED') assertExistingReason(campaign.failureReason, reason, 'WISERR_SUBMISSION_CAMPAIGN_FAILURE_REASON_CONFLICT');
+    else if (status !== 'EXECUTING') throw new Error(`WISERR_SUBMISSION_CAMPAIGN_RESULT_STATE_CONFLICT:${status}`);
+    return;
+  }
+  throw new Error(`WISERR_SUBMISSION_CAMPAIGN_RESULT_OUTCOME_UNSUPPORTED:${result.outcome}`);
+}
+
 export async function ingestWiserrReactivationSubmissionResultAndAdvanceCampaign({ runtime, result, now = new Date() }) {
-  if (!result || typeof result !== 'object') throw new Error('result is required.');
+  validateWiserrSubmissionResult(result);
   requiredString(result.tenantId, 'result.tenantId');
   requiredString(result.commandId, 'result.commandId');
   requiredString(result.attemptId, 'result.attemptId');
   if (runtime?.tenantId !== result.tenantId) throw new Error('WISERR_SUBMISSION_COORDINATOR_RUNTIME_TENANT_MISMATCH');
   const store = assertExecutionRuntime(runtime);
 
-  const applied = await ingestWiserrReactivationSubmissionResult({ runtime, result, now });
   const commandRecord = await loadDurableWiserrReactivationCommand({ store, tenantId: result.tenantId, commandId: result.commandId });
   if (!commandRecord) throw new Error('WISERR_SUBMISSION_COORDINATOR_COMMAND_NOT_FOUND');
   const command = commandRecord.payload.command;
   let campaignRecord = await loadDurableReactivationCampaign({ store, tenantId: result.tenantId, campaignId: command.campaignId });
   if (!campaignRecord) throw new Error('WISERR_SUBMISSION_COORDINATOR_CAMPAIGN_NOT_FOUND');
   assertCampaignIdentity(campaignRecord.payload, command, result);
+  assertCampaignCanApply(campaignRecord.payload, result);
+
+  const applied = await ingestWiserrReactivationSubmissionResult({ runtime, result, now });
+  campaignRecord = await loadDurableReactivationCampaign({ store, tenantId: result.tenantId, campaignId: command.campaignId });
+  assertCampaignIdentity(campaignRecord.payload, command, result);
 
   const reason = reasonFor(result);
   let campaignTransitioned = false;
 
-  if (result.outcome === 'ACCEPTED') {
-    if (!['EXECUTING', 'OBSERVING', 'COMPLETED'].includes(campaignRecord.payload.status)) {
-      throw new Error(`WISERR_SUBMISSION_CAMPAIGN_RESULT_STATE_CONFLICT:${campaignRecord.payload.status}`);
-    }
-  } else if (result.outcome === 'COMPLETED') {
-    if (campaignRecord.payload.status === 'EXECUTING') {
-      campaignRecord = await markDurableReactivationCampaignObserving({ store, tenantId: result.tenantId, campaignId: command.campaignId, now });
-      campaignTransitioned = true;
-    } else if (!['OBSERVING', 'COMPLETED'].includes(campaignRecord.payload.status)) {
-      throw new Error(`WISERR_SUBMISSION_CAMPAIGN_RESULT_STATE_CONFLICT:${campaignRecord.payload.status}`);
-    }
-  } else if (result.outcome === 'AMBIGUOUS') {
-    if (campaignRecord.payload.status === 'EXECUTING') {
-      campaignRecord = await markDurableReactivationCampaignReconciliationRequired({ store, tenantId: result.tenantId, campaignId: command.campaignId, reason, now });
-      campaignTransitioned = true;
-    } else if (campaignRecord.payload.status === 'RECONCILIATION_REQUIRED') {
-      assertExistingReason(campaignRecord.payload.failureReason, reason, 'WISERR_SUBMISSION_CAMPAIGN_RECONCILIATION_REASON_CONFLICT');
-    } else {
-      throw new Error(`WISERR_SUBMISSION_CAMPAIGN_RESULT_STATE_CONFLICT:${campaignRecord.payload.status}`);
-    }
-  } else if (result.outcome === 'SUPPRESSED') {
-    if (campaignRecord.payload.status === 'EXECUTING') {
-      campaignRecord = await stopDurableReactivationCampaign({ store, tenantId: result.tenantId, campaignId: command.campaignId, reason, now });
-      campaignTransitioned = true;
-    } else if (campaignRecord.payload.status === 'STOPPED') {
-      assertExistingReason(campaignRecord.payload.stopReason, reason, 'WISERR_SUBMISSION_CAMPAIGN_STOP_REASON_CONFLICT');
-    } else {
-      throw new Error(`WISERR_SUBMISSION_CAMPAIGN_RESULT_STATE_CONFLICT:${campaignRecord.payload.status}`);
-    }
-  } else if (['NOT_ACCEPTED', 'DEFINITIVE_FAILURE'].includes(result.outcome)) {
-    if (campaignRecord.payload.status === 'EXECUTING') {
-      campaignRecord = await failDurableReactivationCampaign({ store, tenantId: result.tenantId, campaignId: command.campaignId, reason, now });
-      campaignTransitioned = true;
-    } else if (campaignRecord.payload.status === 'FAILED') {
-      assertExistingReason(campaignRecord.payload.failureReason, reason, 'WISERR_SUBMISSION_CAMPAIGN_FAILURE_REASON_CONFLICT');
-    } else {
-      throw new Error(`WISERR_SUBMISSION_CAMPAIGN_RESULT_STATE_CONFLICT:${campaignRecord.payload.status}`);
-    }
-  } else {
-    throw new Error(`WISERR_SUBMISSION_CAMPAIGN_RESULT_OUTCOME_UNSUPPORTED:${result.outcome}`);
+  if (result.outcome === 'COMPLETED' && campaignRecord.payload.status === 'EXECUTING') {
+    campaignRecord = await markDurableReactivationCampaignObserving({ store, tenantId: result.tenantId, campaignId: command.campaignId, now });
+    campaignTransitioned = true;
+  } else if (result.outcome === 'AMBIGUOUS' && campaignRecord.payload.status === 'EXECUTING') {
+    campaignRecord = await markDurableReactivationCampaignReconciliationRequired({ store, tenantId: result.tenantId, campaignId: command.campaignId, reason, now });
+    campaignTransitioned = true;
+  } else if (result.outcome === 'SUPPRESSED' && campaignRecord.payload.status === 'EXECUTING') {
+    campaignRecord = await stopDurableReactivationCampaign({ store, tenantId: result.tenantId, campaignId: command.campaignId, reason, now });
+    campaignTransitioned = true;
+  } else if (['NOT_ACCEPTED', 'DEFINITIVE_FAILURE'].includes(result.outcome) && campaignRecord.payload.status === 'EXECUTING') {
+    campaignRecord = await failDurableReactivationCampaign({ store, tenantId: result.tenantId, campaignId: command.campaignId, reason, now });
+    campaignTransitioned = true;
   }
 
+  assertCampaignCanApply(campaignRecord.payload, result);
   return {
     schemaVersion: 1,
     tenantId: result.tenantId,
