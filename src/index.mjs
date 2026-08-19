@@ -101,6 +101,10 @@ export {
   mutateAuthoritativeRuntimeState
 } from './runtime/atomic-store.mjs';
 export {
+  createPgPoolTransactionRunner,
+  createAtomicPostgresRuntimeStoreFromPool
+} from './runtime/postgres-transaction-adapter.mjs';
+export {
   EXECUTION_ATTEMPT_RECORD_TYPE,
   loadDurableExecutionAttempt,
   listDurableExecutionAttempts,
