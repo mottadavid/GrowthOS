@@ -17,6 +17,7 @@ const INDEXES = [
   'growthos_events_pkey','growthos_events_tenant_recorded_idx','growthos_events_tenant_correlation_recorded_idx',
   'growthos_schema_migrations_pkey'
 ];
+const EXECUTION_ENV = { GROWTHOS_EXECUTION_MODE: 'enabled' };
 
 async function tempMigrations() {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'growthos-bootstrap-'));
@@ -45,15 +46,23 @@ function poolFor(migrations, { missingRecordsTable = false } = {}) {
   };
 }
 
-test('healthy runtime still defaults to READ_ONLY unless execution is explicitly requested', async () => {
+test('healthy runtime defaults to READ_ONLY when execution is not requested and deployment is not enabled', async () => {
   const temp = await tempMigrations();
   try {
     const migrations = await discoverRuntimeMigrations({ directory: temp.directory });
-    const runtime = await bootstrapTenantRuntime({ pool: poolFor(migrations), tenantId: 'tenant-1', migrationDirectory: temp.directory });
+    const runtime = await bootstrapTenantRuntime({
+      pool: poolFor(migrations),
+      tenantId: 'tenant-1',
+      migrationDirectory: temp.directory,
+      env: {}
+    });
     assert.equal(runtime.readiness.ready, true);
     assert.equal(runtime.mode, RUNTIME_MODES.READ_ONLY);
     assert.equal(runtime.executionRequested, false);
+    assert.equal(runtime.deploymentExecution.mode, 'READ_ONLY');
+    assert.equal(runtime.deploymentExecution.source, 'DEFAULT_FAIL_CLOSED');
     assert.equal(runtime.executionEnabled, false);
+    assert.deepEqual(runtime.executionBlockers, ['EXECUTION_NOT_REQUESTED', 'DEPLOYMENT_EXECUTION_DISABLED']);
     assert.equal(runtime.executionStore, null);
     assert.equal(typeof runtime.readStore.getRecord, 'function');
     assert.equal(typeof runtime.readStore.listRecords, 'function');
@@ -64,26 +73,7 @@ test('healthy runtime still defaults to READ_ONLY unless execution is explicitly
   } finally { await temp.cleanup(); }
 });
 
-test('explicit execution request is refused when startup readiness fails', async () => {
-  const temp = await tempMigrations();
-  try {
-    const migrations = await discoverRuntimeMigrations({ directory: temp.directory });
-    const runtime = await bootstrapTenantRuntime({
-      pool: poolFor(migrations, { missingRecordsTable: true }),
-      tenantId: 'tenant-1',
-      executionRequested: true,
-      migrationDirectory: temp.directory
-    });
-    assert.equal(runtime.executionRequested, true);
-    assert.equal(runtime.readiness.ready, false);
-    assert.equal(runtime.mode, RUNTIME_MODES.READ_ONLY);
-    assert.equal(runtime.executionEnabled, false);
-    assert.equal(runtime.executionStore, null);
-    assert.ok(runtime.readiness.blockers.some(item => item.includes('TABLE_MISSING:growthos_records')));
-  } finally { await temp.cleanup(); }
-});
-
-test('execution store is exposed only when explicitly requested and readiness is fully clean', async () => {
+test('explicit execution request cannot override deployment read-only kill switch', async () => {
   const temp = await tempMigrations();
   try {
     const migrations = await discoverRuntimeMigrations({ directory: temp.directory });
@@ -91,13 +81,79 @@ test('execution store is exposed only when explicitly requested and readiness is
       pool: poolFor(migrations),
       tenantId: 'tenant-1',
       executionRequested: true,
-      migrationDirectory: temp.directory
+      migrationDirectory: temp.directory,
+      env: { GROWTHOS_EXECUTION_MODE: 'read_only' }
+    });
+    assert.equal(runtime.readiness.ready, true);
+    assert.equal(runtime.executionRequested, true);
+    assert.equal(runtime.deploymentExecution.executionAllowed, false);
+    assert.equal(runtime.mode, RUNTIME_MODES.READ_ONLY);
+    assert.equal(runtime.executionEnabled, false);
+    assert.deepEqual(runtime.executionBlockers, ['DEPLOYMENT_EXECUTION_DISABLED']);
+
+    let caught = null;
+    try {
+      assertExecutionRuntime(runtime);
+    } catch (error) {
+      caught = error;
+    }
+    assert.equal(caught?.code, 'GROWTHOS_RUNTIME_EXECUTION_DISABLED');
+    assert.deepEqual(caught?.executionBlockers, ['DEPLOYMENT_EXECUTION_DISABLED']);
+  } finally { await temp.cleanup(); }
+});
+
+test('explicit deployment enablement cannot override failed startup readiness', async () => {
+  const temp = await tempMigrations();
+  try {
+    const migrations = await discoverRuntimeMigrations({ directory: temp.directory });
+    const runtime = await bootstrapTenantRuntime({
+      pool: poolFor(migrations, { missingRecordsTable: true }),
+      tenantId: 'tenant-1',
+      executionRequested: true,
+      migrationDirectory: temp.directory,
+      env: EXECUTION_ENV
+    });
+    assert.equal(runtime.executionRequested, true);
+    assert.equal(runtime.deploymentExecution.executionAllowed, true);
+    assert.equal(runtime.readiness.ready, false);
+    assert.equal(runtime.mode, RUNTIME_MODES.READ_ONLY);
+    assert.equal(runtime.executionEnabled, false);
+    assert.equal(runtime.executionStore, null);
+    assert.deepEqual(runtime.executionBlockers, ['STARTUP_READINESS_FAILED']);
+    assert.ok(runtime.readiness.blockers.some(item => item.includes('TABLE_MISSING:growthos_records')));
+  } finally { await temp.cleanup(); }
+});
+
+test('execution store is exposed only when request, deployment mode, and readiness all permit execution', async () => {
+  const temp = await tempMigrations();
+  try {
+    const migrations = await discoverRuntimeMigrations({ directory: temp.directory });
+    const runtime = await bootstrapTenantRuntime({
+      pool: poolFor(migrations),
+      tenantId: 'tenant-1',
+      executionRequested: true,
+      migrationDirectory: temp.directory,
+      env: EXECUTION_ENV
     });
     assert.equal(runtime.mode, RUNTIME_MODES.EXECUTION_ENABLED);
     assert.equal(runtime.executionEnabled, true);
+    assert.equal(runtime.deploymentExecution.mode, 'ENABLED');
+    assert.deepEqual(runtime.executionBlockers, []);
     const store = assertExecutionRuntime(runtime);
     assert.equal(typeof store.mutateRecordAndAppendEvent, 'function');
   } finally { await temp.cleanup(); }
+});
+
+test('invalid deployment execution configuration fails closed before execution can be enabled', async () => {
+  await assert.rejects(
+    () => bootstrapTenantRuntime({
+      pool: {},
+      tenantId: 'tenant-1',
+      executionRequested: true,
+      env: { GROWTHOS_EXECUTION_MODE: 'yes-please' }
+    }),
+    error => error?.code === 'GROWTHOS_EXECUTION_MODE_INVALID'
+  );
 });
 
 test('executionRequested must be an explicit boolean', async () => {
